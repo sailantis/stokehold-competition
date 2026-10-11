@@ -1,0 +1,20 @@
+# Line endings. The shell scripts are the reason this file exists: a `.sh` checked
+# out with CRLF fails on Linux with `#!/bin/bash: No such file or directory`, which
+# names the interpreter rather than the line ending and reads like a missing bash.
+# Forcing LF here means the mistake cannot be re-introduced by a Windows working
+# copy, which is where this repo is edited.
+*.sh text eol=lf
+*.py text eol=lf
+
+# Config templates are shipped to Linux hosts and parsed there; the same argument.
+*.template text eol=lf
+conf/*.template text eol=lf
+
+# PHP and docs are read by tools that do not care, but a single convention is
+# cheaper than deciding per file.
+*.php text eol=lf
+*.md text eol=lf
+*.tsv text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

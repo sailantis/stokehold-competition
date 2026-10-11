@@ -1,0 +1,44 @@
+{
+  "name": "sailantis/stokehold-competition",
+  "description": "One azera page served five ways: stokehold (pipe worker, FastCGI over TCP, FastCGI over a unix socket), RoadRunner, and nginx + php-fpm.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.2",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "sailantis/azera-framework": "dev-main#429219837b4198141205bff539233a744eb1a115",
+    "sailantis/clarity-engine": "dev-main#ee0601086752da7ff1b4592f7fb2ee64f4e6e408",
+    "sailantis/stokehold-worker": "dev-main#5ede306391be1df9fbc8826f26f63e1c305e705a",
+    "spiral/roadrunner-worker": "^3.5",
+    "spiral/roadrunner-http": "^3.5",
+    "nyholm/psr7": "^1.8"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/sailantis/azera-framework.git",
+      "no-api": true
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/sailantis/clarity-engine.git",
+      "no-api": true
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/sailantis/stokehold-php-sdk.git",
+      "no-api": true
+    }
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "App\\Azera\\": "apps/azera/"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

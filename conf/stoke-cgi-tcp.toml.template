@@ -1,0 +1,32 @@
+# ARM T — stokehold + spawn_cgi over LOOPBACK TCP.
+#
+# The cold model: each `php-cgi` child gives every request a full CGI SAPI reset,
+# so the front controller re-runs and the framework boots per request — the same
+# thing php-fpm does. Read against ARM U, which differs only in the transport, and
+# against ARM P, which differs only in the model.
+#
+#   workers = 12   One php-cgi child per core. `php-cgi` processes one request at
+#                  a time, so this is the concurrency ceiling; hazard 23 records
+#                  that sweeping above cores x 2-3 stops helping.
+#
+#   base_port      Each slot needs its own port. The pool increments from here and
+#                  skips ports already taken, so the range must be clear.
+#
+# It is deliberately NOT the default arm. Hazard 26 and the framework measurement
+# in hazard 28 point opposite ways — a unix socket can make the cold transport
+# cheaper, but the resident worker spends far less time booting — and which wins
+# on a real page is the question this repository exists to answer.
+
+default_backend = "cgi"
+
+[server]
+http = "127.0.0.1:{{PORT}}"
+document_root = "{{ROOT}}/public"
+
+[backends.cgi]
+kind = "spawn_cgi"
+binary = "{{PHP_CGI}}"
+workers = 12
+bind_host = "127.0.0.1"
+base_port = {{BASE_PORT}}
+max_requests = 0

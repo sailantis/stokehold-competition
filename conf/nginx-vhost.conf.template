@@ -1,0 +1,80 @@
+# ARM F — the nginx side.
+#
+# nginx exists here only to reach php-fpm, which cannot speak HTTP. It is
+# deliberately as thin as possible: no static-file handling, no compression, no
+# caching, nothing that would let this arm serve a request the other four have to
+# run PHP for.
+#
+# EVERY request goes to the front controller, including one for a file that exists
+# on disk. That is not laziness, it is the only shape that matches the other four
+# arms: stokehold and RoadRunner route everything through the application, so an
+# nginx that answered `/index.php` or `/favicon.ico` itself would be measuring a
+# different server.
+#
+# There is exactly one `location`, and no `try_files`. That is deliberate.
+#
+# The obvious spelling of a front controller is
+#
+#     location / { try_files /index.php =404; }
+#     location = /index.php { fastcgi_pass ...; }
+#
+# and it is wrong. `try_files` treats every argument except the last as a FILE
+# TEST, so `/index.php` is checked on disk, found, and served **as a static file** —
+# nginx hands out the PHP source, unparsed, with a 200. The last argument is the
+# fallback, not the first. (This is the same failure mode hazard 15 in the
+# stokehold plan is about: a file server that will serve a script discloses the
+# application's source. Found here the same way — by reading the response body
+# rather than trusting the 200.)
+#
+# Passing everything to FastCGI in one location has no such trap and is fewer
+# moving parts.
+#
+# `access_log off` matters more than it looks: a log line per request puts disk
+# I/O inside the measurement and it becomes a variable in the comparison rather
+# than a constant.
+
+server {
+    listen 127.0.0.1:{{PORT}};
+    server_name bench.local;
+
+    root {{ROOT}}/public;
+    index index.php;
+
+    access_log off;
+    error_log /var/log/nginx-bench-error.log warn;
+
+    # A run sends small requests; keep the timeout short so a hung arm fails
+    # loudly instead of holding a client slot for the default 60s.
+    fastcgi_read_timeout 30s;
+    fastcgi_send_timeout 30s;
+
+    location / {
+        include fastcgi_params;
+        # nginx needs the transport in the address: a bare path is parsed as a
+        # hostname and rejected with "invalid host in upstream".
+        fastcgi_pass unix:{{SOCKET}};
+        # The script FPM executes. A full CGI reset of this file per request is the
+        # cold model under test.
+        fastcgi_param SCRIPT_FILENAME {{ROOT}}/public/index.php;
+        # `fastcgi_params` does set REQUEST_URI, but it is re-stated because the
+        # application routes on it: were it ever dropped, the router would see
+        # `/index.php` on every request and every arm would serve the same page
+        # while still returning 200.
+        fastcgi_param REQUEST_URI $request_uri;
+        fastcgi_param DOCUMENT_ROOT {{ROOT}}/public;
+    }
+
+    # Diagnostic only, and the one exception to "everything goes to the front
+    # controller". `location /` above means a stray `.php` file is never executed
+    # directly, so a probe served through it would come back 404 from the router
+    # rather than reporting anything. This exact-name location lets the harness ask
+    # the pool what its EFFECTIVE ini is, which is the only way to catch a setting
+    # that looks right in the config file and is not what PHP ended up with:
+    # `php_admin_value[xdebug.mode] = off` leaves the extension loaded and costs 3.1x.
+    # The file exists only while a run is in progress.
+    location = /.bench-ini-probe.php {
+        include fastcgi_params;
+        fastcgi_pass unix:{{SOCKET}};
+        fastcgi_param SCRIPT_FILENAME {{ROOT}}/public/.bench-ini-probe.php;
+    }
+}

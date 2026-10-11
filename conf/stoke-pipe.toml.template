@@ -1,0 +1,33 @@
+# ARM P — stokehold + a resident worker, talking over a pipe.
+#
+# The warmest arm: the framework boots once, before the request loop, and every
+# request reuses the container. Measured against ARM T/U (the same application
+# through a CGI SAPI, booted per request) this is the deployment model's value.
+#
+# Two things to know about the values here:
+#
+#   workers = 12   One per core on the benchmark host. Not "one per core of the
+#                  host you are reading this on": the sweep that produced the
+#                  published figures ran on 12 cores, and matching it is what
+#                  makes the numbers comparable. Hazard 24 in the stokehold plan
+#                  records that worker count and core count are unrelated numbers
+#                  and that the useful sweep is cores x 2-3.
+#
+#   max_requests = 0   Never recycle, which is what php-fpm's `pm.max_requests = 0`
+#                  means. It is written explicitly rather than left out because
+#                  this backend *is* the alternative to a php-fpm pool, and an
+#                  operator arriving from one will look for it. Absent means the
+#                  same thing; see hazard 29 for why the explicit zero matters.
+
+default_backend = "app"
+
+[server]
+http = "127.0.0.1:{{PORT}}"
+document_root = "{{ROOT}}/public"
+
+[backends.app]
+kind = "worker"
+command = "php {{ROOT}}/worker.php"
+workers = 12
+working_dir = "{{ROOT}}"
+max_requests = 0

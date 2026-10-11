@@ -1,0 +1,36 @@
+# ARM R — RoadRunner + a resident worker, talking over a pipe.
+#
+# The second warm arm, and the reason the warm half of the comparison is
+# trustworthy: two independent servers implementing the same model should agree.
+# If they do not, the difference belongs to one server rather than to the model,
+# and no claim about "resident workers versus per-request boot" can be drawn from
+# the pair.
+#
+# It runs the same application through `roadrunner-worker.php`, so the framework
+# work is held equal and only the server differs.
+#
+#   num_workers = 12   Matched to ARM P's worker count. RoadRunner's own published
+#                  configuration for this application class uses one sequential
+#                  worker because azera-competition's variant writes to SQLite and
+#                  a second writer turns the run into a lock-contention study —
+#                  but that concern is about *writes*, and this page only reads.
+#                  Matching P is what makes P-vs-R a server comparison.
+#
+#   max_jobs: 0    RoadRunner's `pm.max_requests`, and 0 is "never recycle" there
+#                  too. Spelled out for the same reason ARM P spells it out.
+
+version: "3"
+
+server:
+  command: "php {{ROOT}}/roadrunner-worker.php"
+  relay: pipes
+
+http:
+  address: "127.0.0.1:{{PORT}}"
+  pool:
+    num_workers: 12
+    max_jobs: 0
+
+logs:
+  mode: production
+  level: warn

@@ -1,0 +1,36 @@
+{% extends "layouts/app" %}
+
+{% block title %}Features{% endblock %}
+
+{% block content %}
+    <h1>Enterprise Feature Demos</h1>
+
+    <p>
+        These endpoints exercise the new azera-framework enterprise subsystems
+        (PSR-3/14/16, AOP, Security) on a real Azera app — without touching
+        the production sailantis-homepage.
+    </p>
+
+    <table>
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for feature in features %}
+            <tr>
+                <td>
+                    <a href="{{ feature:url }}">{{ feature:title }}</a>
+                </td>
+                <td>{{ feature:desc }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+    </table>
+
+    <p class="meta">
+        All endpoints return JSON for easy inspection. Click a link to try one.
+    </p>
+{% endblock %}

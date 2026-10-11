@@ -1,0 +1,57 @@
+{% extends "layouts/app" %}
+
+{% block title %}Items{% endblock %}
+
+{% block content %}
+    {% set title = "Items" %}
+    {% include "partials/header" %}
+
+    <table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Title</th>
+            <th>Created</th>
+            <th>Badge</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for idx, item in items %}
+            <tr {% if idx % 2 == 0 %}class="even"{% endif %}>
+                <td><a href="{{ baseUrl }}/{{ item.id }}">{{ item.id }}</a></td>
+                <td>{{ item.title }}</td>
+                <td>{{ item.created_at }}</td>
+                <td>
+                    {% if item.id % 100 == 0 %}
+                        <span class="badge">Pinned</span>
+                    {% elseif item.id % 10 == 0 %}
+                        <span class="badge">Featured</span>
+                    {% else %}
+                        <span class="badge">Standard</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+    </table>
+
+    <div class="pagination">
+        <span class="page-info">
+            Showing {{ pagination:firstItem }}–{{ pagination:lastItem }}
+            of {{ pagination:totalItems }} items
+        </span>
+        <span class="page-nav">
+            {% if pagination:hasPrevious %}
+                <a href="{{ baseUrl }}?page={{ pagination:previousPage }}">← Previous</a>
+            {% else %}
+                <span class="disabled">← Previous</span>
+            {% endif %}
+            <span class="page-current">Page {{ pagination:currentPage }} / {{ pagination:lastPage }}</span>
+            {% if pagination:hasNext %}
+                <a href="{{ baseUrl }}?page={{ pagination:nextPage }}">Next →</a>
+            {% else %}
+                <span class="disabled">Next →</span>
+            {% endif %}
+        </span>
+    </div>
+{% endblock %}

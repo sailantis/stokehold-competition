@@ -1,0 +1,113 @@
+; ARM F — the php-fpm pool behind nginx.
+;
+; The reference cold arm: the one every PHP deployment already runs, and the one
+; the other four have to justify themselves against. It is a full CGI SAPI reset
+; per request, exactly like ARM T/U, so F-vs-T/U is a server comparison and F-vs-P
+; is the deployment-model comparison the whole repository is about.
+;
+; The values deliberately mirror ARM P where the two settings mean the same thing,
+; because a difference in configuration would be indistinguishable from a
+; difference in server:
+;
+;   pm.max_children = 12   Matches `workers = 12`.
+;   pm.max_requests = 0    Matches `max_requests = 0`: never recycle. This is the
+;                          line hazard 29 is about — `0` is also what a real pool
+;                          config carries, and it is what stokehold used to misread
+;                          as "recycle after every request".
+;
+; The ini overrides below are NOT optional for a fair comparison, and they are the
+; single most expensive lesson in the harness (hazard 28):
+;
+;   opcache.enable_cli = On   php-cgi reads this flag and php-fpm does not. Left
+;                          off, the php-cgi arms recompile every PHP file on every
+;                          request while the FPM arms use a warm opcache — so the
+;                          cold arms are compared under different rules and the
+;                          gap measures ini, not servers. The harness also passes
+;                          this to php-cgi directly; setting it here as well keeps
+;                          both cold arms provably identical.
+;   opcache.validate_timestamps = Off   Nothing changes under a benchmark, and
+;                          leaving it on makes each request stat every script.
+;   opcache.validate_timestamps = Off   Nothing changes under a benchmark, and
+;                          leaving it on makes each request stat every script.
+;   xdebug                  Do NOT try to disable this with
+;                          `php_admin_value[xdebug.mode] = off` — it makes the value
+;                          empty while leaving the extension loaded, and a loaded
+;                          xdebug costs this arm 3.1x. See the note further down;
+;                          the harness disables the extension for the run instead.
+;
+; `pm.status_path` is omitted on purpose: a status request would be served by the
+; pool and counted in a run if anything ever polled it.
+
+[global]
+error_log = /var/log/php-fpm-bench.log
+daemonize = no
+
+[bench]
+listen = {{SOCKET}}
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0660
+
+pm = static
+pm.max_children = 12
+pm.max_requests = 0
+
+; php-fpm refuses to start a pool with no user: "user has not been defined" is an
+; ALERT, not a warning, and it takes the whole service down. Required even when the
+; master runs as root.
+;
+; The user is the account that owns this checkout, not the conventional www-data.
+; SQLite has to write its -wal and -shm files next to the database, and nginx's
+; group is not enough for that — a pool running as www-data against a
+; competition-owned `data/` fails every request with an SQLite error from inside
+; the framework's boot. Running every arm as the same user also removes file
+; ownership as a difference between the arms.
+user = {{USER}}
+group = {{GROUP}}
+
+; The worker count must be reachable without a spawn burst: `static` keeps all 12
+; resident, so a run never measures pool start-up. `ondemand`/`dynamic` would turn
+; the first seconds of every measurement into a process-management study.
+
+catch_workers_output = yes
+php_admin_value[error_log] = /var/log/php-fpm-bench-worker.log
+php_admin_flag[log_errors] = on
+
+; These are read back from inside the pool by the harness's ini probe, because a
+; line that looks right here and is not applied is invisible from the outside.
+;
+; `opcache.enable_cli` is NOT one of them: it is a CLI flag and has no effect on
+; php-fpm, which is why the probe reads it as 0 and that is correct. What matters
+; for FPM is `validate_timestamps`, which defaults to ON and makes every request
+; stat every script it includes.
+php_admin_value[memory_limit] = 512M
+php_admin_flag[opcache.enable] = 1
+php_admin_value[opcache.validate_timestamps] = 0
+
+; The timezone is pinned so no arm can differ by reading it from the environment.
+php_admin_value[date.timezone] = UTC
+
+; xdebug is deliberately NOT configured here.
+;
+; The obvious line — `php_admin_value[xdebug.mode] = off` — does not do what it
+; looks like. Measured with a probe that prints `ini_get('xdebug.mode')` from inside
+; the pool: setting it to `off` makes the value come back EMPTY, while removing the
+; line leaves it at its default `develop`. Neither stops xdebug loading, and a loaded
+; xdebug costs this arm **3.1x**: with its ini file present `/` measured 591 rps and
+; `/items` 339; with the extension not loaded at all, 1817 and 818. That is a bigger
+; effect than any of the deployment-model differences this repository is measuring,
+; which is exactly why it must not be left to an ini setting.
+;
+; The harness therefore removes xdebug's conf.d file for the duration of the run and
+; restores it afterwards (`disable_fpm_xdebug`/`restore_fpm_xdebug` in
+; `scripts/bench.sh`). Disabling the extension is the only setting that is provably
+; equivalent to not having it.
+;
+; It matters here and not only for this arm: the php-cgi arms get `xdebug.mode=off`
+; through their wrapper, and an ini value that silently becomes empty would depress
+; those arms too — the same class of mistake as `opcache.enable_cli`, one layer down.
+
+; The document root and, more importantly, the environment: the front controller
+; needs nothing beyond what the request carries, so no per-arm variable is set.
+; Anything set here would make this arm different from T/U for a reason that is
+; not the server.
