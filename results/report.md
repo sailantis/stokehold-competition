@@ -69,15 +69,17 @@ The latencies say what kind of problem it is:
 | U `/items` c=32 | 3.09 ms | 32.70 ms |
 
 At c=1 the *median* is fine and `p99` is 23× the median; roughly one request in four
-pays ~40 ms. That is the delayed-ACK/Nagle signature — a response needing more than one
-write waits for the peer's delayed acknowledgement — and it scales with response size,
-which is why `/` (5 KB, 1.0×) is unaffected and `/items` (10 KB) is destroyed. A unix
-socket has no Nagle, no delayed ACK and no `TCP_NODELAY` to mis-set.
+pays ~40 ms. An unchanged median with a ~40 ms tail is a timer-based stall, and 40 ms
+is the Linux **delayed-ACK** timer rather than the RTO (which starts in the hundreds of
+milliseconds) — so a response that needs more than one write waits for the peer's
+delayed acknowledgement. It scales with how many chunks the response is written in,
+which is why `/` (5 KB, **1.0×** T/U) is unaffected and `/items` (10 KB) is destroyed.
+A unix socket has no Nagle, no delayed ACK and no `TCP_NODELAY` to mis-set.
 
-The same shape appears in the other TCP arms, at a level the loopback hop alone cannot
-explain: **T is 9.8× slower than U on `/`'s sibling transport comparison but only 1.4×**
-on `/`, and the whole `spawn_cgi`+TCP configuration should be *faster* than the piped
-worker if TCP were innocent — hazard 25 measured it scaling past 30k on a small response.
+That mechanism is the strong evidence, not the two data points. What the run shows
+directly is the shape: identical p50, a 40 ms tail, a 1.0× ratio on the small endpoint
+and 3.5–29× on the large one, with the server, model, SAPI and entry script all held
+equal.
 
 ## What this says about the deployment model
 
