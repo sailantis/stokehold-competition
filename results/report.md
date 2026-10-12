@@ -29,6 +29,15 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 > come from it; note that the per-concurrency ratios in the two tables below move by up to
 > 5% either way, and the largest single ratio move (P/F at c=1 on `/`, +15%) is driven by one
 > noisy cell whose three repeats span 9.6%.
+>
+> **One thing was checked rather than assumed.** The run's own teardown reported 8 stray
+> `php-cgi` processes, and because the arms run P, T, U, R, F, those strays existed while the
+> last two arms were being measured. They were verified harmless rather than argued harmless:
+> R and F were re-run with the strays cleared, and the two arms moved by a median of 1.0%
+> across their 20 cells — inside the spread, and in the direction *opposite* to a slowdown
+> (R read 4–5% *higher* on the clean re-run). A leaked `php-cgi` blocked on a socket consumes
+> no CPU, so it does not compete with the arm under test. The harness's stray check runs only
+> once, at the end; a mid-run version of it would have caught this the moment it happened.
 
 > **The previous revision (stokehold `841c963`) refreshed the five measured tables after the
 > transport-buffering pass** — every read and write path in stokehold's three transports now
