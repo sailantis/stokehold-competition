@@ -63,9 +63,9 @@ SKIP_FPM=1       bash scripts/bench.sh
 CROSSOVER=1 CROSS_CONC=1,4,8,16 bash scripts/bench.sh
 ```
 
-## Three measurements, three questions
+## Four measurements, four questions
 
-The repository runs three passes, and reading the wrong one is the mistake this
+The repository runs four passes, and reading the wrong one is the mistake this
 project made for several weeks:
 
 | pass | holds concurrency at | answers |
@@ -73,14 +73,26 @@ project made for several weeks:
 | `wrk` sweep | the slot count (12) | how many requests per second can this host push |
 | `latency.php` | 1 | what does one request cost, with nothing to overlap it |
 | `crossover.php` | a range, 1..16 | at what load does the model advantage disappear |
+| `diag-split.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
 
-They disagree, and both of the first two are right. A 12-slot sweep overlaps every
+They disagree, and the first two are both right. A 12-slot sweep overlaps every
 request's framework boot with eleven other requests, so the boot vanishes from the
 aggregate rate; a single request gets no such help. The same pair of servers reads
-as **2.07x** and **1.00x** depending on which pass is asked. The crossover pass
-measures the middle and finds the advantage shrinking from 1.98x at concurrency 1
-to 1.63x at 16 — it does not cross over within the range this host can generate
-load for.
+as **2.15x** and **2.02x** depending on which pass is asked. The crossover pass
+measures the middle and finds the advantage flat at ~2.0x from concurrency 1 to 16
+— it does not cross over within the range this host can generate load for.
+
+The fourth pass exists because the third one left a discrepancy it could not
+explain: stokehold's warm arm sat ~10% behind RoadRunner's on *every* endpoint,
+while running the same application through the same model. Wall clock cannot
+localise that — both servers report the same latency and the same rps — but CPU
+can, because the total is the sum of two halves. `diag-split.sh` attributes CPU
+per request across the arm's process tree (walked up the PPID chain, not matched on
+process name) and showed the whole gap was in stokehold's own server process:
+413 µs against 309 µs, with the two totals agreeing to 1%. `diag-profile.sh` then
+named three functions, each of which made a full pass over the response body per
+request, and fixing them took the front-end from 413 µs to 137 µs — now cheaper
+than RoadRunner's 153 µs, and enough to put stokehold ahead end to end.
 
 The third pass exists because of a harness bug worth recording: the first version
 drove N handles from one process with `curl_multi` and reported concurrency 2 as
@@ -88,6 +100,11 @@ drove N handles from one process with `curl_multi` and reported concurrency 2 as
 client, not the servers — `curl_multi_select($multi, 0.05)` takes seconds, so its
 retry floor was 50 ms. The current version runs N processes, each using the same
 blocking loop `latency.php` uses, and agrees with it to 0.1% at concurrency 1.
+
+**The lesson from the fourth pass, which the other three could not teach:** two
+numbers agreeing to 10% is not evidence that either is right. It took attributing
+CPU, rather than measuring wall time more carefully, to find a 3x cost difference
+hidden inside a 10% throughput difference.
 
 ## What the harness refuses to do
 
@@ -155,6 +172,8 @@ seed.php                creates data/bench.sqlite
 apps/azera/             the application, copied from azera-competition
 conf/                   one stamped config per arm
 scripts/bench.sh        the harness
+scripts/diag-split.sh   CPU per request: server process vs PHP workers
+scripts/diag-profile.sh perf record on the server process, flat symbol report
 results/                published numbers
 ```
 
@@ -170,3 +189,9 @@ medians. Ratios are the point, not absolute figures: absolute throughput depends
 on the host, while the warm-over-cold ratio is a property of how much the
 application boots — which is exactly the thing the earlier trivial-handler
 measurements could not see.
+
+**When a ratio surprises you, measure whose CPU it is before theorising.** The
+`diag-*` scripts are here because that is how the largest single finding in this
+repository was made: a 10% throughput gap between two servers was a 3x difference
+in *server* CPU per request, invisible in wall clock, and fixing it moved the
+result by more than any configuration change in the history of the harness.

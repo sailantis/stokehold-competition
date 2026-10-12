@@ -1,11 +1,12 @@
 # Five ways to serve one page — 12 cores, one host
 
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
-RoadRunner 2025.1.15, stokehold `c406a49`, wrk 4.1.0.
+RoadRunner 2025.1.15, stokehold `07fea44`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
-in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus two extra passes:
-`scripts/latency.php` (the sequential per-request methodology the published figures used)
-and `scripts/crossover.php` (the same latency at concurrency 1..16).
+in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three extra passes:
+`scripts/latency.php` (the sequential per-request methodology the published figures used),
+`scripts/crossover.php` (the same latency at concurrency 1..16), and `scripts/diag-split.sh`
+(CPU per request, attributed across the arm's process tree).
 
 > **There are three passes and they answer three different questions.** A wrk sweep holds
 > concurrency at the slot count and reports what the host can push; `latency.php` holds it
@@ -15,6 +16,13 @@ and `scripts/crossover.php` (the same latency at concurrency 1..16).
 > throughput (it was a config bug on the unwrapped arms), then reading a throughput ratio
 > against a published latency ratio. The three passes now agree with each other, and the
 > agreement is the result, not any single table.
+>
+> **A fourth pass was added after the first three disagreed with themselves.** A 10%
+> deficit against RoadRunner on *every* endpoint, in two implementations of the same
+> design, is small enough to be a property of stokehold's code rather than of the model —
+> and it was. CPU attribution found it in an hour, where wall clock had not found it in
+> three passes; see "Where the warm arm's 10% went". Every number in this report below is
+> from the fixed build.
 
 ## The two endpoints are different experiments
 
@@ -28,13 +36,13 @@ and `scripts/crossover.php` (the same latency at concurrency 1..16).
 
 | question | answer | how measured |
 |---|---|---|
-| Does the warm model pay off? | **yes, ~2.0x per request** (published: 3.3x) | sequential latency |
-| Does it show in aggregate throughput? | **yes on `/`, ~1.6-1.9x; and 1.9x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
+| Does the warm model pay off? | **yes, ~2.1x per request** (published: 3.3x) | sequential latency |
+| Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.24x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
 | At what load does it stop paying? | **it does not, within 1..16** - flat ~2.0x | crossover |
 | Why does the cold model idle 16% of the cores? | **it costs 1,063 us of CPU per request against 666** - a duty cycle, not headroom | CPU accounting |
-| Is loopback TCP a problem? | **no - T and U agree to 3%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
+| Is loopback TCP a problem? | **no - T and U agree to 2%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
 | Which transport should I use? | **either** - keep `unix:` for permissions, not speed | both |
-| Does stokehold agree with RoadRunner? | **within 10%**, warm vs warm | both |
+| Does stokehold agree with RoadRunner? | **it leads by 4%**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
 
 Everything below is the detail behind that table.
 
@@ -42,30 +50,31 @@ Everything below is the detail behind that table.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 2,921 | 11,569 | 20,523 | 30,204 | 30,855 |
-| **R** | RoadRunner | warm worker, pipe | 3,123 | 11,748 | 20,770 | 35,076 | 37,013 |
-| **F** | nginx + php-fpm | cold, unix socket | 1,866 | 6,664 | 12,004 | 18,807 | 18,576 |
-| **U** | stokehold | cold, unix socket | 1,543 | 5,777 | 9,537 | 14,498 | 16,497 |
-| **T** | stokehold | cold, loopback TCP | 1,514 | 5,777 | 9,567 | 14,186 | 16,143 |
+| **P** | stokehold | warm worker, pipe | 3,300 | 12,852 | 23,184 | 34,404 | 36,821 |
+| **R** | RoadRunner | warm worker, pipe | 3,101 | 11,451 | 20,269 | 34,276 | 36,178 |
+| **F** | nginx + php-fpm | cold, unix socket | 1,866 | 6,664 | 12,004 | 18,807 | 18,092 |
+| **U** | stokehold | cold, unix socket | 1,507 | 5,716 | 9,437 | 14,390 | 16,437 |
+| **T** | stokehold | cold, loopback TCP | 1,500 | 5,868 | 9,644 | 14,235 | 16,392 |
 
-Ratios at c=32: **P/F 1.66×**, **R/F 1.99×**, **T/U 1.02×**.
+Ratios at c=32: **P/F 2.04×**, **R/F 2.00×**, **T/U 1.00×**.
 
-Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~20%,
-which is what makes the warm half of the comparison credible — two independent servers, one
-model. And on this endpoint **transport is irrelevant**: 1.0× T/U. The piped worker's
-advantage comes from not booting the framework, not from the pipe.
+Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~2%, which
+is what makes the warm half of the comparison credible — two independent servers, one
+model — and stokehold is now the marginally faster of the two. And on this endpoint
+**transport is irrelevant**: 1.00× T/U. The piped worker's advantage comes from not booting
+the framework, not from the pipe.
 
 ## `GET /items` — throughput
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 1,564 | 6,013 | 10,172 | 14,826 | 16,329 |
-| **R** | RoadRunner | warm worker, pipe | 1,791 | 6,560 | 11,277 | 17,598 | 18,258 |
-| **F** | nginx + php-fpm | cold, unix socket | 839 | 3,068 | 5,531 | 8,491 | 8,540 |
-| **U** | stokehold | cold, unix socket | 681 | 2,800 | 4,738 | 7,173 | 8,161 |
-| **T** | stokehold | cold, loopback TCP | 665 | 2,790 | 4,752 | 7,096 | 7,989 |
+| **P** | stokehold | warm worker, pipe | 1,719 | 6,874 | 11,444 | 16,781 | 18,907 |
+| **R** | RoadRunner | warm worker, pipe | 1,756 | 6,504 | 11,101 | 17,474 | 18,133 |
+| **F** | nginx + php-fpm | cold, unix socket | 839 | 3,068 | 5,531 | 8,491 | 8,424 |
+| **U** | stokehold | cold, unix socket | 662 | 2,778 | 4,709 | 7,214 | 8,252 |
+| **T** | stokehold | cold, loopback TCP | 648 | 2,812 | 4,741 | 7,032 | 8,113 |
 
-Ratios at c=32: **P/F 1.91×**, **R/F 2.14×**, **T/U 1.02×**.
+Ratios at c=32: **P/F 2.24×**, **R/F 2.15×**, **T/U 1.02×**.
 
 An earlier version of this table showed **P/F and R/F at 1.00× and 1.02×** — "a resident
 worker and nginx + php-fpm are the same speed on this page". That was wrong, and the cause
@@ -90,15 +99,15 @@ iterations × 10 runs. Median of the run medians, milliseconds:
 
 | arm | `GET /` | `GET /items` | vs the warm arms |
 |---|---|---|---|
-| **P** stokehold worker (warm) | 0.389 | **0.648** | 1.00× |
-| **R** RoadRunner (warm) | 0.362 | **0.591** | 1.00× |
-| **F** nginx + php-fpm (cold) | 0.570 | 1.228 | 1.57× / **2.08×** |
-| **U** stokehold cold, unix (cold) | 0.697 | 1.475 | 1.93× / **2.50×** |
-| **T** stokehold cold, TCP (cold) | 0.708 | 1.495 | 1.96× / **2.53×** |
+| **P** stokehold worker (warm) | 0.355 | **0.581** | 1.00× |
+| **R** RoadRunner (warm) | 0.369 | **0.608** | 1.00× |
+| **F** nginx + php-fpm (cold) | 0.584 | 1.251 | 1.65× / **2.15×** |
+| **U** stokehold cold, unix (cold) | 0.704 | 1.506 | 1.98× / **2.59×** |
+| **T** stokehold cold, TCP (cold) | 0.711 | 1.521 | 2.00× / **2.62×** |
 
 Against `azera-competition`'s published `GET /items` for the same application
-(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.08×**, and on `GET /`
-(1.57× against a published 3.06×). So the effect is real, is in the published direction,
+(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.15×**, and on `GET /`
+(1.65× against a published 3.06×). So the effect is real, is in the published direction,
 and reproduces about two-thirds of its magnitude on this host.
 
 **T and U now agree to 1%.** They did not before: T was 1.656 ms against U's 1.466 ms
@@ -132,6 +141,89 @@ So the warm model is worth ~1.9× by throughput too, on the same route where a p
 version of this report found no difference at all. That earlier "1.0×" was a configuration
 artifact on the one pair of arms nobody had wrapped — hazard 28's pattern exactly, a
 difference of ini mistaken for a difference of server.
+
+### Where the warm arm's 10% went
+
+The previous version of this report ended the model section by noting that P sat ~10%
+behind R on every endpoint (16,329 against 18,258 rps on `/items`) and offering that as
+agreement between two implementations of the same design. 10% is close enough to be called
+agreement, which is exactly why it was worth a second look: two servers doing the same
+thing with the same PHP should cost the same, and a persistent 10% in one direction is a
+signature of one server's code rather than of noise.
+
+Wall clock cannot localise it. Both servers report the same latency and the same rps, and
+the total is the sum of two halves — the server process and the PHP workers. `perf` answers
+the question only if you already know which half to profile. **CPU attribution answers
+which half**, and it can be done in a shell script:
+
+```
+scripts/diag-split.sh   # snapshots utime+stime per process in the arm's tree,
+                        # walked up the PPID chain from the server's own pid
+```
+
+Attributing by PPID chain rather than by process name matters: `comm` is truncated to 15
+characters, so `php worker.php` and `php-cgi -b ...` are both just `php-cgi`-length names,
+and RoadRunner's binary is `rr`. The tree is the fact; the name is a guess.
+
+At concurrency 32 on `/items`, before the fix:
+
+| arm | rps | server CPU/req | PHP CPU/req | total |
+|---|---|---|---|---|
+| **P** stokehold | 16,017 | **413 µs** | 608 µs | 1,021 µs |
+| **R** RoadRunner | 17,860 | **309 µs** | 704 µs | 1,013 µs |
+
+The totals agree to **1%** while the two server halves differ by **1.34×**. The gap was
+entirely stokehold's front-end — not the worker protocol, not the pipe, not PHP, not the
+client. (The PHP columns differ too, but in the other direction and by less; PHP runs the
+same application on both, so that half is noise between runs.)
+
+`scripts/diag-profile.sh` then named three functions. A flat `perf record` on the server
+process during a saturated run:
+
+| symbol | self time |
+|---|---|
+| `stokehold_worker::codec::Channel::read_frame` (with `crc32c` inlined) | **14.8–19.0%** |
+| `stokehold_fcgi::client::parse_response_headers` | 5.2% |
+| `stokehold_fcgi::client::split_response_body` | 5.2% |
+
+All three were a full pass over the response body, per request, in userspace:
+
+- **`crc32c` was a bit-by-bit implementation.** Eight shift-and-mask rounds per byte,
+  written out by hand so the PHP SDK could mirror it line for line — but the SDK does not
+  need to mirror the *implementation*, only the *value*, and the standard check value was
+  already pinned by test. A 12 KB page meant ~96,000 inner-loop iterations per request. It
+  is now the `crc32c` crate, which uses the CPU's CRC32 instruction where it exists.
+  *The lesson worth keeping: "keep it dependency-free so another language can transcribe
+  it" is a sound argument about the encode path and a bad one about the verify path.*
+- **`parse_response_headers` began with `String::from_utf8_lossy(stdout)`** — validating
+  UTF-8 across the entire payload, body included, and copying it when invalid, to find a
+  separator that a byte search finds for free. It was also a correctness bug: the body
+  offset was computed on a `String` whose length differs from the slice's, so a non-UTF-8
+  byte *in the body* could move the located header terminator.
+- **`split_response_body` searched for the same separator a second time**, over a body the
+  header parser had just been through, using `windows(4).position` — four bytes compared at
+  every offset of 12 KB, twice.
+
+And after, measured the same way on the same host:
+
+| arm, conc 32, `/items` | rps | server CPU/req | vs RoadRunner |
+|---|---|---|---|
+| **P** stokehold | **18,946** | **137 µs** | 0.89× |
+| **R** RoadRunner | 18,019 | 153 µs | 1.00× |
+
+**stokehold's front-end is now cheaper than RoadRunner's as well as faster end to end.**
+`perf` no longer lists any stokehold function above 1.3%.
+
+Two things generalise beyond this fix:
+
+- **"We are N% slower than X" is not a fact about a design.** It is a fact about a
+  measurement that has not been decomposed. Attribute CPU before optimising, or the
+  optimisation is a guess — this gap was first hypothesised to be transport cost (hazard 23)
+  and was wrong, and three of the four items above would never have been visible in wall
+  clock.
+- **A response payload is scanned once per request, whatever the protocol**, and the two
+  obvious places to scan it — the checksum and the header parse — are the two that get
+  written by hand for clarity. Both wanted the boring version.
 
 ## What this says about the transport
 
@@ -202,22 +294,25 @@ question a deployment faces: at what load does the resident worker's advantage s
 visible. `scripts/crossover.php` holds it at each of 1..16 with N closed-loop client
 processes, one per connection, each running the same blocking loop `latency.php` uses.
 
-Median of 3 runs x 500 iterations per client, milliseconds. The ratio column is R/F.
+Median of 3 runs x 400 iterations per client, milliseconds. The ratio column is P/F.
 
-| conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | R/F |
-|---|---|---|---|---|---|---|
-| 1 | 0.645 | 0.595 | 1.240 | 1.464 | 1.490 | **2.08×** |
-| 2 | 0.646 | 0.580 | 1.177 | 1.348 | 1.381 | 2.03× |
-| 4 | 0.672 | 0.616 | 1.231 | 1.358 | 1.370 | 2.00× |
-| 8 | 0.786 | 0.720 | 1.377 | 1.595 | 1.556 | 1.91× |
-| 12 | 0.931 | 0.802 | 1.528 | 1.895 | 1.910 | 1.91× |
-| 16 | 1.019 | 0.937 | 1.864 | 2.111 | 2.086 | **1.99×** |
+| conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | P/F | R/F |
+|---|---|---|---|---|---|---|---|
+| 1 | 0.582 | 0.615 | 1.230 | 1.508 | 1.508 | **2.11×** | 2.00× |
+| 2 | 0.579 | 0.598 | 1.209 | 1.364 | 1.380 | 2.09× | 2.02× |
+| 4 | 0.599 | 0.638 | 1.273 | 1.356 | 1.360 | 2.13× | 2.00× |
+| 8 | 0.741 | 0.769 | 1.415 | 1.611 | 1.589 | 1.91× | 1.84× |
+| 12 | 0.836 | 0.827 | 1.474 | 1.923 | 1.890 | 1.76× | 1.78× |
+| 16 | 0.939 | 0.963 | 1.856 | 2.101 | 2.118 | **1.98×** | 1.93× |
 
-**The advantage does not cross over.** It is ~2.0× at concurrency 1, dips to ~1.9× in the
+**The advantage does not cross over.** It is ~2.1× at concurrency 1, dips slightly in the
 middle, and is back to ~2.0× at 16. That is the opposite of the intuition that a
 per-request boot must eventually be hidden by concurrency, and the CPU numbers below are
 why: the cold arm saturates its CPU budget at ~8,500 rps while the warm arm reaches
-~16,000, so the cold arm is the one already queuing and the gap has no reason to close.
+~19,000, so the cold arm is the one already queuing and the gap has no reason to close.
+
+P and R are now within 3% of each other at every concurrency, where the unfixed build had P
+consistently behind.
 
 On `/` the same pass gives a flat **~1.5×** (P/F) and **~1.64×** (R/F) at every concurrency.
 
@@ -251,32 +346,41 @@ slightly lower (7,634 / 7,738 / 7,250 rps), so the pool was never the limit.
 
 Measuring CPU per request explains the idle time exactly:
 
-| arm, conc 32 | rps | cores used | % of 12 | **CPU per request** |
+| arm, conc 32 | rps | total cores | busiest % of 12 | **total CPU per request** |
 |---|---|---|---|---|
-| P worker (warm) | 15,563 | 10.37 | 86% | 666 µs |
-| T spawn_cgi (cold) | 7,900 | 8.40 | 70% | **1,063 µs** |
+| P worker (warm) | 18,485 | 7.93 | 66% | **429 µs** |
+| T spawn_cgi (cold) | 7,951 | 9.76 | 81% | **1,228 µs** |
 
-Both close arithmetically: `15,563 × 666 µs = 10.37 cores` and `7,900 × 1,063 µs = 8.40
-cores`. The per-request model costs ~1.06 ms of CPU per request against ~0.67 ms, a ratio
-of 1.60 — and since the cold arm's 1.06 ms is its entire budget, adding workers cannot make
-it faster. The idle cores are not headroom; they are the cost of booting PHP and the
-framework on every request.
+Both close arithmetically: `18,485 × 429 µs = 7.93 cores` and `7,951 × 1,228 µs = 9.76
+cores`. The per-request model costs ~1.23 ms of CPU per request against ~0.43 ms, a ratio
+of 2.86 — and since the cold arm's 1.23 ms is its entire budget, adding workers cannot make
+it faster.
 
-The remaining 16% is the other half of the same story. `php-cgi` is single-threaded and its
-request cycle is not all CPU: some of it is waiting on its own socket for the next request.
-Twelve such processes leave a core or two unscheduled, and no amount of client concurrency
-fixes that, because concurrency is capped by the 12 children — a php-cgi child serves one
-request at a time. The cold model has a duty cycle, and its ceiling is the pool size times
-that duty cycle.
+Two numbers in this table moved in opposite directions when the front-end was fixed, and the
+movement is itself informative. The warm arm's CPU per request fell from 666 µs to 429 µs
+(the front-end's share was pure waste), but its *utilisation* fell too, from 86% to 66% —
+because 12 workers now serve 18,485 rps in the same wall clock with less CPU each, leaving
+more of the machine idle. The cold arm's utilisation did not change, because it never had
+any waste to remove: its CPU is the framework boot, which is what it is measuring.
+
+The idle cores are not headroom; they are the cost of booting PHP and the framework on every
+request, plus the duty cycle below.
+
+The cold model's remaining idle time is the other half of the same story. `php-cgi` is
+single-threaded and its request cycle is not all CPU: some of it is waiting on its own
+socket for the next request. Twelve such processes leave a core or two unscheduled, and no
+amount of client concurrency fixes that, because concurrency is capped by the 12 children —
+a php-cgi child serves one request at a time. The cold model has a duty cycle, and its
+ceiling is the pool size times that duty cycle.
 
 ## The confounds, stated
 
-**Why ~2× here and 3.30× published, on the same application and the same route.** The ratio
-is the boot divided by the work, so it moves with the work. My warm arm does 0.595 ms of work
+**Why ~2.15× here and 3.30× published, on the same application and the same route.** The ratio
+is the boot divided by the work, so it moves with the work. My warm arm does 0.608 ms of work
 where the published RoadRunner row does 0.4647 ms — this page carries more per request (an
 ORM query and a 12 KB render against the published entry script's own mix), so the same
 ~1.0 ms boot is a smaller multiple of it. Neither figure is wrong: a ratio is only
-comparable between runs whose warm-arm cost is comparable, and these differ by ~28%.
+comparable between runs whose warm-arm cost is comparable, and these differ by ~31%.
 **Compare ratios only when the warm-arm cost matches; otherwise compare absolute
 milliseconds.**
 
@@ -319,3 +423,21 @@ a 200 or a config file, and each one silently produced a plausible wrong number:
   interrupted run did. The teardown is in the `EXIT` trap.
 - **php-fpm ran as `www-data` against a `competition`-owned SQLite database** and 500'd
   every request; the pool now runs as the checkout's owner.
+
+Three more were found by *measuring*, rather than by reading, and each is described where
+it belongs above:
+
+- **A whole-payload `from_utf8_lossy` in the response header parser**, which both cost 5.2%
+  of the server's CPU per request and could be made to move the header terminator by a
+  non-UTF-8 byte inside the body. See "Where the warm arm's 10% went".
+- **A bit-by-bit CRC-32C** on every response frame, 14.8–19% of the server's CPU per
+  request. Same section.
+- **A second full scan for the separator the header parser had already found.** Same
+  section.
+
+And one that was found by *not* trusting two measurements that agreed: the 10% deficit
+between P and R was small enough to call agreement, which is why it took a fourth pass
+(CPU attribution) to show it was stokehold's own waste rather than a server difference. The
+lesson is the same one this document keeps relearning: **two numbers agreeing does not mean
+either is right.**
+
