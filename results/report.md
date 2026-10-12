@@ -1,12 +1,21 @@
 # Five ways to serve one page — 12 cores, one host
 
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
-RoadRunner 2025.1.15, stokehold `07fea44`, wrk 4.1.0.
+RoadRunner 2025.1.15, stokehold `841c963`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
 in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three extra passes:
 `scripts/latency.php` (the sequential per-request methodology the published figures used),
 `scripts/crossover.php` (the same latency at concurrency 1..16), and `scripts/diag-split.sh`
 (CPU per request, attributed across the arm's process tree).
+
+> **This revision (stokehold `841c963`) refreshes the five measured tables after the
+> transport-buffering pass** — every read and write path in stokehold's three transports now
+> enters the kernel once per frame instead of once per frame *field*. It changes throughput by
+> a few percent, not by a factor; the A/B against the previous build is at the foot of the
+> transport section. The two CPU-attribution tables ("Where the warm arm's 10% went", "The
+> cold model's real cost is CPU") are carried over from the previous build and were not
+> re-measured; their conclusions — a duty cycle, not headroom — do not depend on the few
+> percent that moved.
 
 > **There are three passes and they answer three different questions.** A wrk sweep holds
 > concurrency at the slot count and reports what the host can push; `latency.php` holds it
@@ -37,12 +46,13 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 | question | answer | how measured |
 |---|---|---|
 | Does the warm model pay off? | **yes, ~2.1x per request** (published: 3.3x) | sequential latency |
-| Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.24x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
+| Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.23x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
 | At what load does it stop paying? | **it does not, within 1..16** - flat ~2.0x | crossover |
 | Why does the cold model idle 16% of the cores? | **it costs 1,063 us of CPU per request against 666** - a duty cycle, not headroom | CPU accounting |
-| Is loopback TCP a problem? | **no - T and U agree to 2%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
+| Is loopback TCP a problem? | **no - T and U agree to 4%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
 | Which transport should I use? | **either** - keep `unix:` for permissions, not speed | both |
-| Does stokehold agree with RoadRunner? | **it leads by 4%**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
+| Does stokehold agree with RoadRunner? | **it leads by 3% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
+| What was the syscall-buffering pass worth? | **2-6% on `/`, nothing on `/items`** - a fixed cost removed, not a proportional one | A/B, two binaries |
 
 Everything below is the detail behind that table.
 
@@ -50,13 +60,13 @@ Everything below is the detail behind that table.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 3,300 | 12,852 | 23,184 | 34,404 | 36,821 |
-| **R** | RoadRunner | warm worker, pipe | 3,101 | 11,451 | 20,269 | 34,276 | 36,178 |
-| **F** | nginx + php-fpm | cold, unix socket | 1,866 | 6,664 | 12,004 | 18,807 | 18,092 |
-| **U** | stokehold | cold, unix socket | 1,507 | 5,716 | 9,437 | 14,390 | 16,437 |
-| **T** | stokehold | cold, loopback TCP | 1,500 | 5,868 | 9,644 | 14,235 | 16,392 |
+| **P** | stokehold | warm worker, pipe | 3,394 | 13,379 | 23,953 | 35,656 | 37,766 |
+| **R** | RoadRunner | warm worker, pipe | 3,150 | 11,698 | 20,600 | 34,787 | 36,754 |
+| **F** | nginx + php-fpm | cold, unix socket | 1,832 | 6,572 | 12,001 | 19,065 | 18,652 |
+| **U** | stokehold | cold, unix socket | 1,592 | 5,910 | 9,837 | 14,844 | 17,119 |
+| **T** | stokehold | cold, loopback TCP | 1,524 | 6,008 | 9,955 | 14,792 | 16,506 |
 
-Ratios at c=32: **P/F 2.04×**, **R/F 2.00×**, **T/U 1.00×**.
+Ratios at c=32: **P/F 2.02×**, **R/F 1.97×**, **T/U 1.04×**.
 
 Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~2%, which
 is what makes the warm half of the comparison credible — two independent servers, one
@@ -68,13 +78,13 @@ the framework, not from the pipe.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 1,719 | 6,874 | 11,444 | 16,781 | 18,907 |
-| **R** | RoadRunner | warm worker, pipe | 1,756 | 6,504 | 11,101 | 17,474 | 18,133 |
-| **F** | nginx + php-fpm | cold, unix socket | 839 | 3,068 | 5,531 | 8,491 | 8,424 |
-| **U** | stokehold | cold, unix socket | 662 | 2,778 | 4,709 | 7,214 | 8,252 |
-| **T** | stokehold | cold, loopback TCP | 648 | 2,812 | 4,741 | 7,032 | 8,113 |
+| **P** | stokehold | warm worker, pipe | 1,795 | 7,012 | 11,749 | 17,152 | 19,277 |
+| **R** | RoadRunner | warm worker, pipe | 1,809 | 6,646 | 11,333 | 17,743 | 18,365 |
+| **F** | nginx + php-fpm | cold, unix socket | 821 | 3,112 | 5,506 | 8,591 | 8,653 |
+| **U** | stokehold | cold, unix socket | 705 | 2,809 | 4,752 | 7,248 | 8,262 |
+| **T** | stokehold | cold, loopback TCP | 659 | 2,849 | 4,854 | 7,204 | 8,177 |
 
-Ratios at c=32: **P/F 2.24×**, **R/F 2.15×**, **T/U 1.02×**.
+Ratios at c=32: **P/F 2.23×**, **R/F 2.12×**, **T/U 1.01×**.
 
 An earlier version of this table showed **P/F and R/F at 1.00× and 1.02×** — "a resident
 worker and nginx + php-fpm are the same speed on this page". That was wrong, and the cause
@@ -99,18 +109,18 @@ iterations × 10 runs. Median of the run medians, milliseconds:
 
 | arm | `GET /` | `GET /items` | vs the warm arms |
 |---|---|---|---|
-| **P** stokehold worker (warm) | 0.355 | **0.581** | 1.00× |
-| **R** RoadRunner (warm) | 0.369 | **0.608** | 1.00× |
-| **F** nginx + php-fpm (cold) | 0.584 | 1.251 | 1.65× / **2.15×** |
-| **U** stokehold cold, unix (cold) | 0.704 | 1.506 | 1.98× / **2.59×** |
-| **T** stokehold cold, TCP (cold) | 0.711 | 1.521 | 2.00× / **2.62×** |
+| **P** stokehold worker (warm) | 0.330 | **0.571** | 1.00× |
+| **R** RoadRunner (warm) | 0.370 | **0.605** | 1.00× |
+| **F** nginx + php-fpm (cold) | 0.573 | 1.241 | 1.74× / **2.17×** |
+| **U** stokehold cold, unix (cold) | 0.686 | 1.458 | 2.08× / **2.55×** |
+| **T** stokehold cold, TCP (cold) | 0.682 | 1.445 | 2.07× / **2.53×** |
 
 Against `azera-competition`'s published `GET /items` for the same application
-(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.15×**, and on `GET /`
-(1.65× against a published 3.06×). So the effect is real, is in the published direction,
+(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.17×**, and on `GET /`
+(1.74× against a published 3.06×). So the effect is real, is in the published direction,
 and reproduces about two-thirds of its magnitude on this host.
 
-**T and U now agree to 1%.** They did not before: T was 1.656 ms against U's 1.466 ms
+**T and U agree to 1%.** They did not before: T was 1.656 ms against U's 1.466 ms
 because of a 40 ms-per-request stall in stokehold's own client, not because of the
 transport. See "What this says about the transport" — that was the single largest
 correction in this report's history, and it moved T by 34×.
@@ -287,6 +297,42 @@ rather than a measurement.
 The lesson from all three attempts, kept because it would have skipped all of them: **a
 number that is suspiciously round in wall time is a timer, not a rate.**
 
+### The buffering pass: what the syscall cut was worth in wall clock
+
+Hazard 38 in `stokehold/docs/plan.md` replaced every unbuffered transport stream with a
+buffered one, so a frame — a header followed by a payload — stops costing one `read(2)` per
+field. The counted syscalls fell a long way: the worker's response read went **6 → 1**, the
+FastCGI client's reply **4 → 1**, and the front-end's handling of a twelve-record request
+**40 → 1**.
+
+Those are syscall counts, not throughput, and the difference is worth measuring rather than
+assuming. Two binaries — one from the commit before the pass, one from after — on the same
+host, same harness, three repeats, medians:
+
+| arm | endpoint | conc | before | after | |
+|---|---|---|---|---|---|
+| P worker (pipe) | `/` | 32 | 36,986 | **38,141** | +3.1% |
+| P worker (pipe) | `/` | 8 | 23,800 | 24,320 | +2.2% |
+| T spawn_cgi (TCP) | `/` | 32 | 15,901 | **16,868** | **+6.1%** |
+| U spawn_cgi (unix) | `/` | 32 | 16,506 | 16,900 | +2.4% |
+| T spawn_cgi (TCP) | `/items` | 32 | 8,006 | 8,009 | 0% |
+| U spawn_cgi (unix) | `/items` | 32 | 8,353 | 8,254 | −1.2% |
+| P worker (pipe) | `/items` | 32 | 18,739 | 19,438 | +3.7% |
+
+So: **2–6% where the request and response are small, and nothing where the request already
+spends its time elsewhere.** `/items` runs an ORM query and a 12 KB render, so six saved
+syscalls on each side vanish into noise — the spread *within* one binary is larger than the
+difference between them (T's `/items` c=32 repeats were 8,006 / 8,275 / 8,448).
+
+Two caveats, stated rather than buried. The A/B is **not a clean isolation**: the earlier
+binary is the commit before the buffering pass, which also predates two other commits, so
+part of the gain belongs to those. And the large 40-read figure buys the *least* throughput,
+because in practice nginx sends the whole CGI environment in **one** `PARAMS` record — the
+twelve-record request is what this front-end tolerates, not what it receives.
+
+**A syscall cut is a fixed cost removed, not a proportional one.** It pays where the request
+is otherwise cheap, which is exactly the `GET /` arm a deployment comparison leads with.
+
 ## The crossover — latency under concurrency
 
 The table above holds concurrency at 1 and the sweep holds it at 12. Neither answers the
@@ -298,21 +344,21 @@ Median of 3 runs x 400 iterations per client, milliseconds. The ratio column is 
 
 | conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | P/F | R/F |
 |---|---|---|---|---|---|---|---|
-| 1 | 0.582 | 0.615 | 1.230 | 1.508 | 1.508 | **2.11×** | 2.00× |
-| 2 | 0.579 | 0.598 | 1.209 | 1.364 | 1.380 | 2.09× | 2.02× |
-| 4 | 0.599 | 0.638 | 1.273 | 1.356 | 1.360 | 2.13× | 2.00× |
-| 8 | 0.741 | 0.769 | 1.415 | 1.611 | 1.589 | 1.91× | 1.84× |
-| 12 | 0.836 | 0.827 | 1.474 | 1.923 | 1.890 | 1.76× | 1.78× |
-| 16 | 0.939 | 0.963 | 1.856 | 2.101 | 2.118 | **1.98×** | 1.93× |
+| 1 | 0.586 | 0.620 | 1.220 | 1.399 | 1.434 | **2.08×** | 1.97× |
+| 2 | 0.567 | 0.596 | 1.202 | 1.321 | 1.324 | 2.12× | 2.02× |
+| 4 | 0.600 | 0.612 | 1.248 | 1.321 | 1.325 | 2.08× | 2.04× |
+| 8 | 0.717 | 0.737 | 1.385 | 1.585 | 1.529 | 1.93× | 1.88× |
+| 12 | 0.820 | 0.834 | 1.464 | 1.879 | 1.844 | 1.79× | 1.76× |
+| 16 | 0.888 | 0.964 | 1.819 | 2.068 | 2.031 | **2.05×** | 1.89× |
 
 **The advantage does not cross over.** It is ~2.1× at concurrency 1, dips slightly in the
-middle, and is back to ~2.0× at 16. That is the opposite of the intuition that a
+middle, and is back to ~2.05× at 16. That is the opposite of the intuition that a
 per-request boot must eventually be hidden by concurrency, and the CPU numbers below are
 why: the cold arm saturates its CPU budget at ~8,500 rps while the warm arm reaches
 ~19,000, so the cold arm is the one already queuing and the gap has no reason to close.
 
-P and R are now within 3% of each other at every concurrency, where the unfixed build had P
-consistently behind.
+P and R are now within 8% of each other at every concurrency and within 3% at c=32, where
+the unfixed build had P consistently behind.
 
 On `/` the same pass gives a flat **~1.5×** (P/F) and **~1.64×** (R/F) at every concurrency.
 
