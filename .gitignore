@@ -17,6 +17,9 @@ results/*.tsv
 !results/raw.tsv
 !results/crossover.tsv
 !results/latency.tsv
+# A superseded sweep is kept, not deleted: the report quotes ratios that only a
+# later build can be compared against, and a comparison needs both sides.
+!results/raw-*.tsv
 results/*.log
 !results/run.log
 *.log

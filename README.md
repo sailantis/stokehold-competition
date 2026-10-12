@@ -190,6 +190,20 @@ on the host, while the warm-over-cold ratio is a property of how much the
 application boots — which is exactly the thing the earlier trivial-handler
 measurements could not see.
 
+That is also why a superseded sweep is kept rather than overwritten. `results/raw.tsv`
+is the current run, `results/raw-841c963.tsv` the one before it, and
+`scripts/compare_runs.py` prints both tables and the ratio change between them:
+
+```bash
+python3 scripts/compare_runs.py results/raw-841c963.tsv results/raw.tsv
+```
+
+Read the ratios, not the throughput. A 1.5% median change across the cells is
+consistent with noise — RoadRunner moved by 2.8% in the last re-run without a
+single line of its code changing, which is the honest indicator of how much of
+any such difference is real. A *ratio* that moves further than the spread is the
+thing worth explaining.
+
 **When a ratio surprises you, measure whose CPU it is before theorising.** The
 `diag-*` scripts are here because that is how the largest single finding in this
 repository was made: a 10% throughput gap between two servers was a 3x difference
