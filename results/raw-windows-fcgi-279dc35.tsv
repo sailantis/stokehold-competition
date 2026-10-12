@@ -1,0 +1,32 @@
+# Interleaved three-arm Windows run, stokehold 279dc35, 2026-10-13
+# Host: Ryzen 5 7500F, 6 cores / 12 threads, NOT idle (20-30% background load).
+# PHP 8.3.31 ZTS. GET /items, 12 slots per arm, 3 rounds of 5 s per cell, arms cycled within each level.
+# 0 errors and 0 worker respawns in all 27 runs. cpu is per arm process tree (server + its PHP children).
+# arm	conc	round	endpoint	label	rps	p50_ms	p95_ms	errors	cpu_ms_per_request	cpu_pct_of_host	respawn
+P	1	1	/items	P stokehold+worker(socket)	1065.6	1.005	1.577	0	0.9296	8.3	False
+U	1	1	/items	U stokehold+spawn_cgi(named pipe)	274.4	3.515	5.226	0	3.5961	8.2	False
+T	1	1	/items	T stokehold+spawn_cgi(tcp)	267.0	3.617	5.430	0	3.7542	8.4	False
+P	1	2	/items	P stokehold+worker(socket)	1201.0	0.790	1.508	0	0.8741	8.7	False
+U	1	2	/items	U stokehold+spawn_cgi(named pipe)	190.7	4.956	7.979	0	4.6187	7.3	False
+T	1	2	/items	T stokehold+spawn_cgi(tcp)	260.2	3.681	5.555	0	3.8162	8.3	False
+P	1	3	/items	P stokehold+worker(socket)	1096.7	0.936	1.548	0	0.9059	8.3	False
+U	1	3	/items	U stokehold+spawn_cgi(named pipe)	177.7	5.289	8.436	0	5.2728	7.8	False
+T	1	3	/items	T stokehold+spawn_cgi(tcp)	225.7	4.337	6.073	0	4.2450	8.0	False
+P	12	1	/items	P stokehold+worker(socket)	6369.6	1.613	3.859	0	1.1575	61.4	False
+U	12	1	/items	U stokehold+spawn_cgi(named pipe)	1614.8	7.040	11.596	0	4.5079	60.7	False
+T	12	1	/items	T stokehold+spawn_cgi(tcp)	1605.5	7.090	11.788	0	4.7510	63.6	False
+P	12	2	/items	P stokehold+worker(socket)	9717.4	1.099	2.350	0	0.8129	65.8	False
+U	12	2	/items	U stokehold+spawn_cgi(named pipe)	1580.3	7.109	12.347	0	4.5148	59.5	False
+T	12	2	/items	T stokehold+spawn_cgi(tcp)	1594.5	7.089	11.949	0	4.7965	63.7	False
+P	12	3	/items	P stokehold+worker(socket)	6942.2	1.604	3.215	0	1.1066	64.0	False
+U	12	3	/items	U stokehold+spawn_cgi(named pipe)	1641.4	7.028	11.401	0	4.5825	62.7	False
+T	12	3	/items	T stokehold+spawn_cgi(tcp)	1630.8	6.918	11.725	0	4.7009	63.9	False
+P	32	1	/items	P stokehold+worker(socket)	7716.4	2.672	11.507	0	1.0132	65.2	False
+U	32	1	/items	U stokehold+spawn_cgi(named pipe)	1592.3	15.976	47.430	0	4.6215	61.3	False
+T	32	1	/items	T stokehold+spawn_cgi(tcp)	1592.4	15.873	48.915	0	4.7885	63.5	False
+P	32	2	/items	P stokehold+worker(socket)	7414.0	2.874	12.023	0	1.0591	65.4	False
+U	32	2	/items	U stokehold+spawn_cgi(named pipe)	1584.4	15.686	50.000	0	4.7253	62.4	False
+T	32	2	/items	T stokehold+spawn_cgi(tcp)	1320.0	18.181	60.194	0	4.8625	53.5	False
+P	32	3	/items	P stokehold+worker(socket)	6346.2	2.999	12.574	0	0.9949	52.6	False
+U	32	3	/items	U stokehold+spawn_cgi(named pipe)	1728.3	13.902	47.656	0	4.4792	64.5	False
+T	32	3	/items	T stokehold+spawn_cgi(tcp)	1692.5	15.021	44.948	0	4.5925	64.8	False

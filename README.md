@@ -43,7 +43,8 @@ expected to be large; this repository is what checks that on a real page.
 ## The conclusion is platform-dependent, and Windows inverts it
 
 The published run is Linux, and on Linux the warm arm wins by the margin the
-hypothesis predicted. **On Windows it loses**, and the reason is not the server:
+hypothesis predicted. **On Windows with a pipe-transported worker it loses**, and the
+reason is not the server:
 
 | what PHP is reading | median | p95 |
 |---|---|---|
@@ -77,6 +78,82 @@ both transports with no PHP-side change, so the arm can be measured on either. T
 SDK version pinned in `composer.json` must include `connect()`, since a worker that
 calls a method the pinned SDK does not have is a startup fatal error rather than a
 degraded path.
+
+**The inversion is the pipe's doing, and it is worth saying what it is not.** It is
+not Windows making FastCGI good. `spawn_cgi` measured on the same host peaks at
+**~1,730 rps against the resident worker's ~9,700 on `/items`** — about 5.6× — so once
+the warm arm is not crippled by the pipe it wins on Windows by a *larger* margin than
+the Linux arms show (8,385 against 19,504, or 2.3×). Windows is slower for both
+deployment models; it is the cold one that pays much more of the penalty:
+
+| metric (`GET /items`) | Linux, 12 cores, idle | Windows, 6c/12t, 20–30% busy | ratio |
+|---|---|---|---|
+| resident worker, sequential p50 | 0.556 ms | 0.82 ms | 1.5× |
+| FastCGI, sequential p50 | 1.52 ms | 4.6 ms | **3.0×** |
+| peak throughput, resident worker | 19,504 rps | 9,717 rps | 0.50× |
+| peak throughput, FastCGI | 8,385 rps | 1,728 rps | **0.21×** |
+
+So the deployment-model conclusion is not platform-specific after all — the resident
+worker wins on both, and wins *more* easily on Windows. What was platform-specific was
+the pipe.
+
+## FastCGI on Windows is fine, and its transport does not matter
+
+There is no Windows counterpart to the Linux arm F: `php-fpm` does not exist on
+Windows, so neither the `external` nor the `spawn_fpm` backend can run there, and
+**`spawn_cgi` is the only FastCGI path**. That makes Windows the one place the
+FastCGI transport pair can be compared directly, because `php-cgi -b` binds a
+**named pipe** for a `\\.\pipe\` address and loopback TCP for a `host:port` one.
+
+Three arms interleaved within each concurrency level (so background drift cannot be
+charged to whichever arm ran during a busy moment), 3 rounds of 5 s per cell, 12
+slots each, **0 errors and 0 worker respawns in all 27 runs**:
+
+| conc | `spawn_cgi` + **named pipe** | `spawn_cgi` + TCP | `worker` + socket | worker/pipe | worker/tcp | pipe/tcp |
+|---|---|---|---|---|---|---|
+| 1 | 274 rps | 267 rps | 1,201 rps | 4.38× | 4.50× | 1.028 |
+| 12 | 1,641 rps | 1,631 rps | 9,717 rps | 5.92× | 5.96× | **1.006** |
+| 32 | 1,728 rps | 1,693 rps | 7,716 rps | 4.46× | 4.56× | 1.021 |
+
+**The FastCGI transport is a non-question — 0.6–2.8% apart at every level** — and the
+CPU column says why:
+
+| conc | worker CPU/req | fcgi-pipe CPU/req | fcgi-tcp CPU/req |
+|---|---|---|---|
+| 1 | 0.93 ms | 5.27 ms | 4.25 ms |
+| 12 | 1.16 ms | 4.58 ms | 4.80 ms |
+| 32 | 1.06 ms | 4.73 ms | 4.86 ms |
+
+A `spawn_cgi` request costs **5×** the CPU of a worker request, because the CGI SAPI
+pays the framework boot every time. The transport difference is 42 µs on a 4.6 ms
+request (hazard 45 measured 168 µs against 211 µs over the FastCGI exchange alone) —
+about 0.9%, which is the size of the ~1.5% latency difference above. **Hazard 45
+extrapolated that 42 µs to "an end-to-end effect of about 8%"** by assuming the
+exchange was a large share of a request. It is not, and the prediction is not borne
+out: 42 µs is ~1% of a ~4.6 ms request, not ~40%. Where the same reasoning *does*
+hold is the worker, and that is the whole of hazard 46/47: there the pipe read was
+15 ms against a ~1 ms request, because a worker's read *is* the request, whereas a
+FastCGI exchange is a rounding error on one. It cannot show up as throughput here,
+and it does not.
+
+Two things were checked rather than assumed:
+
+- **No ini confound.** `php-cgi` and the `php` CLI read the same `php.ini` with identical
+  values on this host (`opcache.enable=1`, `opcache.enable_cli=1`, `memory_limit=128M`,
+  xdebug off), so unlike the Linux harness — which needs its `php-cgi-bench` wrapper
+  because `php-cgi` reads `opcache.enable_cli` and `php-fpm` does not — no wrapper was
+  used. `opcache.jit=tracing` is set but `opcache.jit_buffer_size=0`, so no JIT runs on
+  any arm.
+- **Idle FCGI pools cost nothing.** 24 parked `php-cgi` processes consumed **exactly 0
+  CPU** over a 5 s idle sample, so leaving them up does not pollute another arm.
+
+**One method note, because it bit.** A block-ordered run of the same two arms reported the
+named pipe **22% faster** at c=1 (5.29 ms against 4.34 ms) and 22% *slower* at c=32 (15.98
+against 18.18). Alternating them round by round gives the opposite of the first and no
+support for the second — pipe 4.50–4.76 ms against TCP 4.59–4.68 ms, the same to 1.5%. **A
+22% effect that reverses sign between two runs of the same arms is drift**, and on a host
+with 20–30% background load a block layout manufactures exactly that. Compare by cycling,
+not by blocks.
 
 ## What the loopback socket does under load
 
