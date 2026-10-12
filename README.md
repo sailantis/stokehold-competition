@@ -40,6 +40,44 @@ where the model is held equal. The stokehold plan already measured pipe and TCP 
 identical to concurrency 8 on a trivial handler, so the pipe-specific cost is not
 expected to be large; this repository is what checks that on a real page.
 
+## The conclusion is platform-dependent, and Windows inverts it
+
+The published run is Linux, and on Linux the warm arm wins by the margin the
+hypothesis predicted. **On Windows it loses**, and the reason is not the server:
+
+| what PHP is reading | median | p95 |
+|---|---|---|
+| a **pipe** | **~8 ms** | **~15.4 ms** |
+| a **socket** | **~0.09 ms** | — |
+
+PHP's Windows stream layer takes ~100× longer to return from a blocking read on a
+pipe than on a socket, and the cost is paid *per request*. So on Windows arm P —
+warm, but pipe-transported — is slower than arms T/U, which are cold but
+socket-transported, and the warm/cold comparison inverts. Nothing stokehold does
+causes it: a Rust process reading the identical pipe returns in 0.010 ms, and
+RoadRunner measured 15.15 ms against stokehold's 15.24 ms on the same host — two
+independent servers and two independent SDKs agreeing to 0.6%.
+
+**So `arm P` on Windows is not the deployment model's value; it is the pipe's
+cost.** stokehold has a `transport = "socket"` option for this (see its README and
+plan hazard 46), and with it the same warm arm measures **0.72 ms median against
+15.24 ms on the pipe** — 21× faster, a 0.06 ms spread across 9 runs, and the two
+ranges are disjoint by two orders of magnitude. That is back in line with the Linux
+figure, which is what shows the difference is the transport rather than the
+platform. To reproduce the Windows comparison:
+
+```bash
+# the worker follows STOKEHOLD_WORKER_SOCKET when the server sets it
+# (Stokehold\Worker::connect()), so only the config differs
+transport = "socket"    # [backends.app]
+```
+
+`worker.php` uses `Stokehold\Worker::connect()` for exactly this reason: it drives
+both transports with no PHP-side change, so the arm can be measured on either. The
+SDK version pinned in `composer.json` must include `connect()`, since a worker that
+calls a method the pinned SDK does not have is a startup fatal error rather than a
+degraded path.
+
 ## Reproducing
 
 ```bash
