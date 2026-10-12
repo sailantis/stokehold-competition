@@ -13,6 +13,11 @@ The page is `GET /items`: one SQLite query through the azera ORM, rendered by a
 ClarityEngine template, through a controller with middleware. It is the cheapest
 route that still boots the container.
 
+The design memory behind stokehold itself — the numbered hazards, the step list and
+the open decisions — is [`stokehold/docs/plan.md`](https://github.com/sailantis/stokehold/blob/main/docs/plan.md).
+Where this README says "hazard 46" it means entry 46 there, and its section 10
+("Where the work stands") is the current state of the build.
+
 ## The five arms
 
 | arm | server | model | transport |
