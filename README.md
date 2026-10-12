@@ -86,6 +86,18 @@ php seed.php
 bash scripts/bench.sh
 ```
 
+`composer install`, not `composer update`, and `composer.lock` is **tracked** here. That is
+deliberate, and it is the opposite of a library's convention: the lock is an input to the
+measurement. Eleven dependencies are floating ranges — including `spiral/roadrunner`, which *is*
+the RoadRunner arm — so an unlocked `composer install` a month from now would benchmark a
+different RoadRunner against the same stokehold and quietly produce an incomparable number. The
+lock fixes every one of them; the three `sailantis/*` packages are pinned by commit ref in
+`composer.json` itself. If a run ever needs a newer RoadRunner, move the lock on purpose and say
+so in the results, rather than letting `composer update` do it silently.
+
+`composer validate --check-lock` reports the lock as current with the committed `composer.json`,
+and its `content-hash` was regenerated with the same no-flags `json_encode` Composer itself uses.
+
 `bench.sh` needs `wrk`, `php-cgi`, and — for the FPM arm — `nginx`, `php-fpm` and
 passwordless `sudo` (it writes one pool file and one vhost, both named
 `bench-stokehold`, and removes them afterwards). Missing pieces skip their arms
