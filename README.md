@@ -127,8 +127,14 @@ Two honest caveats. Comparing 8.6k against the Linux `wrk` figure of ~19.4k mixe
 generators and hosts, so it is indicative and not evidence; the like-for-like
 comparison is the sequential one, where socket 0.82 ms against Linux 0.556 ms is the
 same order and pipe 15.26 ms against Linux 0.556 ms is not. And the raw rows are
-committed as `results/raw-windows-279dc35.tsv` (`P` = socket, `Pp` = pipe) so every
-figure above can be re-derived with `scripts/compare_runs.py` rather than believed.
+committed as `results/raw-windows-279dc35.tsv` — the 70 rows behind this table, five
+repeats per cell and **zero errors in any of them**, in the repository's own raw
+format, so every figure above is the median of five committed rows rather than a
+number taken on trust. The two transports carry separate arm keys (`P` = socket,
+`Pp` = pipe) on purpose: `scripts/compare_runs.py` keys a cell on `(arm, conc,
+endpoint)`, so giving both rows `P` would have merged the two transports into one
+median and destroyed the comparison. `compare_runs.py` loads the file and reports the
+`P` cells; the `Pp` rows are in the same file for the same treatment.
 
 ## Reproducing
 
