@@ -78,6 +78,58 @@ SDK version pinned in `composer.json` must include `connect()`, since a worker t
 calls a method the pinned SDK does not have is a startup fatal error rather than a
 degraded path.
 
+## What the loopback socket does under load
+
+The 0.72 ms figure above is a *sequential* measurement. The question a Windows
+deployment actually faces is what the socket does once the pool is saturated, and
+because the pipe arm is capped by something the socket arm is not, the answer is not
+the same ratio. Measured on this host (Ryzen 5 7500F, 6 cores / 12 threads, PHP
+8.3.31 ZTS, stokehold `279dc35`), `GET /items`, 12 workers, 5 runs of 5 s per cell:
+
+| conc | socket rps | pipe rps | ratio | socket p50 | pipe p50 |
+|---|---|---|---|---|---|
+| 1 | 1,418 | 66 | **21.5×** | 0.658 ms | 15.11 ms |
+| 4 | 5,297 | 265 | **20.0×** | 0.683 ms | 15.10 ms |
+| 8 | 8,651 | 528 | **16.4×** | 0.903 ms | 15.09 ms |
+| 12 | 8,528 | 775 | **11.0×** | 1.215 ms | 15.53 ms |
+| 16 | 8,796 | 775 | **11.3×** | 1.547 ms | 16.04 ms |
+| 24 | 8,655 | 774 | **11.2×** | 2.082 ms | 31.03 ms |
+| 32 | 8,599 | 773 | **11.1×** | 2.504 ms | 45.34 ms |
+
+**The peak is ~8,800 rps against ~775 — a ceiling ratio of 11.3×, and 26× the Linux
+pipe figure.** The interesting part is *why the ratio shrinks from 21× to 11×*, and it
+is neither arm's fault:
+
+- **The pipe arm cannot use more than one worker.** Up to concurrency 8 it scales
+  linearly at **exactly 66 rps per connection** (66 / 132 / 264 / 528), and then stops
+  dead. It saturates at **775 rps regardless of whether 12 or 32 connections are
+  offered** — 12 workers × 66 rps, within 0.4% across every cell. The ceiling *is* the
+  15 ms per read, and nothing the client does can move it. Beyond 12 connections the
+  extra ones merely queue, which is why p50 rises to 31 ms and then 45 ms while
+  throughput does not move at all.
+- **The socket arm is worth ~1,390 rps per worker** (8,651 at 8 connections against the
+  pipe's 528) and is capped at **~9,000 rps by CPU, not by the pool**: at c=12 it uses
+  **61–63% of the whole host while the pipe arm uses 2.9–6.6%**, and *adding* concurrency
+  past 12 buys nothing because every worker is already busy.
+
+That the socket's 11× is a *CPU* ceiling rather than a limit of the loopback transport
+was checked rather than assumed, because the load generator is home-grown: one client
+at c=12 (9,306 rps) and two clients at c=6 each (9,209 total) land in the same place,
+so the client is not scarce, and its own cost is **0.06 ms per request** (½ core at
+8,200 rps). The server's 12 workers are the limit.
+
+So under load the loopback socket is not merely the difference between a responsive
+Windows deployment and an unusable one — it is the difference between **~775 rps and
+~8,800 rps**, and it does it while *leaving* 38% of the host idle for PHP, where the
+pipe arm sits blocked and consumes almost nothing.
+
+Two honest caveats. Comparing 8.6k against the Linux `wrk` figure of ~19.4k mixes load
+generators and hosts, so it is indicative and not evidence; the like-for-like
+comparison is the sequential one, where socket 0.82 ms against Linux 0.556 ms is the
+same order and pipe 15.26 ms against Linux 0.556 ms is not. And the raw rows are
+committed as `results/raw-windows-279dc35.tsv` (`P` = socket, `Pp` = pipe) so every
+figure above can be re-derived with `scripts/compare_runs.py` rather than believed.
+
 ## Reproducing
 
 ```bash
