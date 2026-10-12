@@ -3,18 +3,35 @@
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
 RoadRunner 2025.1.15, stokehold `c73c05c`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
-in every arm, endpoints `GET /` and `GET /items`, no failed cells.
+in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus
+`scripts/latency.php`, the sequential per-request methodology the published figures used.
+
+> **Read the latency section, not the throughput tables, for the deployment-model and
+> transport questions.** This report originally answered both from wrk throughput at
+> 12-way concurrency and got both wrong: a 12-slot sweep overlaps every request's
+> framework boot with eleven other requests, so the per-request cost that the published
+> ratios measure is invisible in the aggregate rate. The throughput tables are still
+> correct as throughput, and the throughput question is a real one; they simply do not
+> answer the question that was being asked of them.
 
 ## The two endpoints are different experiments
 
-This is the first thing to understand, because it decides which table answers which
-question.
-
 - **`GET /`** returns 5 KB and does almost no work: the container is built, the route
   matches, a tiny template renders. It measures **the server and the deployment model**.
-- **`GET /items`** returns ~10 KB, runs one ORM query and renders 20 rows. It measures
+- **`GET /items`** returns ~12 KB, runs one ORM query and renders 20 rows. It measures
   **the server, the model, and a response large enough to be divided across transport
-  segments**. The second part turns out to matter more than the first.
+  segments**.
+
+## Corrected summary
+
+| question | answer | how measured |
+|---|---|---|
+| Does the warm model pay off? | **yes, ~2.0-2.1x per request** (published: 3.3x) | sequential latency |
+| Does it show in aggregate throughput? | **no, ~1.0x** - the boot overlaps across slots | wrk, 12 slots |
+| Is loopback TCP a problem? | **~10% on a large response, 0% with fresh connections** | latency + curl |
+| Does stokehold agree with RoadRunner? | **within 3%**, warm vs warm | both |
+
+Everything below is the detail behind that table.
 
 ## `GET /` — the server and the model
 
@@ -33,13 +50,11 @@ every point, which is what makes the warm half of the comparison credible — tw
 independent servers, one model. And on this endpoint **transport is irrelevant**: 1.0×
 T/U. The piped worker's advantage comes from not booting the framework, not from the pipe.
 
-The absolute margin is small, and it is ~1.15×, not the 3.1–7.5× of the published
-dataset. That is expected rather than contradictory: a 5 KB response is dominated by
-server overhead, so the boot it saves is a small share of the total. The larger ratio is
-the property of an endpoint whose response is nearly free and whose work is almost all
-container — which is precisely what the next endpoint is not.
+The absolute margin is small, and it is ~1.15x, not the 3.1-7.5x of the published
+dataset. By throughput the warm model is worth 1.15-1.4x; by latency (further down) it is
+worth ~1.5-2.1x. Both are true — they answer different questions.
 
-## `GET /items` — a larger response changes the answer
+## `GET /items` — throughput
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
@@ -47,90 +62,116 @@ container — which is precisely what the next endpoint is not.
 | **R** | RoadRunner | warm worker, pipe | 901 | 3,288 | 5,470 | 8,577 | 8,727 |
 | **F** | nginx + php-fpm | cold, unix socket | 830 | 3,036 | 5,493 | 8,401 | 8,552 |
 | **U** | stokehold | cold, unix socket | 687 | 2,803 | 4,675 | 7,080 | 8,107 |
-| **T** | stokehold | cold, **loopback TCP** | **198** | **261** | **267** | **283** | **281** |
+| **T** | stokehold | cold, loopback **TCP** | **198** | **261** | **267** | **283** | **281** |
 
-**P/F is 1.00×. R/F is 1.02×.** A resident worker and nginx + php-fpm are the *same
-speed* on this page. And the TCP arm is not slow by a little — it stops scaling
-altogether, 198 → 281 rps across the whole concurrency sweep.
-
-### Why the TCP arm collapses, and why it is not one server's bug
-
-`T` and `U` are the same server, the same model, the same SAPI, the same 12 slots, the
-same page. The only difference is a unix socket versus loopback TCP, and the ratio is
-**28.9×** at c=32.
-
-The latencies say what kind of problem it is:
-
-| | p50 | p99 |
-|---|---|---|
-| T `/items` c=1 | 1.81 ms | **42.50 ms** |
-| U `/items` c=1 | 1.42 ms | 1.84 ms |
-| T `/items` c=32 | **110.03 ms** | 523.87 ms |
-| U `/items` c=32 | 3.09 ms | 32.70 ms |
-
-At c=1 the *median* is fine and `p99` is 23× the median; roughly one request in four
-pays ~40 ms. An unchanged median with a ~40 ms tail is a timer-based stall, and 40 ms
-is the Linux **delayed-ACK** timer rather than the RTO (which starts in the hundreds of
-milliseconds) — so a response that needs more than one write waits for the peer's
-delayed acknowledgement. It scales with how many chunks the response is written in,
-which is why `/` (5 KB, **1.0×** T/U) is unaffected and `/items` (10 KB) is destroyed.
-A unix socket has no Nagle, no delayed ACK and no `TCP_NODELAY` to mis-set.
-
-That mechanism is the strong evidence, not the two data points. What the run shows
-directly is the shape: identical p50, a 40 ms tail, a 1.0× ratio on the small endpoint
-and 3.5–29× on the large one, with the server, model, SAPI and entry script all held
-equal.
+**P/F is 1.00x. R/F is 1.02x.** A resident worker and nginx + php-fpm are the same speed
+on this page by aggregate throughput. The T column is a measurement artifact: one wrk
+connection lands on one pool slot, so it measures one slot's serial behaviour rather
+than the pool's — explained under "What this says about the transport".
 
 ## What this says about the deployment model
 
-**On these endpoints, the warm model's advantage is smaller than the published dataset
-implies, and on `/items` it is nil.** The honest explanation has three parts.
+**The published ratio reproduces — as a per-request latency figure. My throughput sweep did
+not show it, and that was a methodology mistake on my side.**
 
-1. **The boot really is only ~1.0 ms here.** Measured directly inside a warm php-cgi
-   child: a fresh pool pays 7.2–7.5 ms on the first request to each of its 12 slots
-   (opcache cold), and **1.00 ms** steady-state thereafter. So a cold request over a
-   unix socket costs ~1.0 ms of boot + ~1.0 ms of work, and removing the boot can
-   therefore buy at most ~2× at c=1.
-2. **The published 3.1–7.5× ratios compare an application with a large container boot
-   against a request that does almost nothing else** (RoadRunner 0.255 ms vs php-fpm
-   0.785 ms on azera). That is a real and fair measurement of a real configuration, but
-   it is not comparable to a page that spends half its time on an ORM query and a
-   template render.
-3. **On `/` this run agrees with the published direction and not the magnitude**:
-   1.15×, against ~1.1× on a trivial handler (hazard 25) and 3.1× on the published azera
-   `GET /`. The difference between the last two is the endpoint's work, not the server.
+`scripts/latency.php` re-implements the published primitive exactly: `hrtime()` around one
+`curl_exec` at a time, a single reused connection, an untimed verified warm-up, 500–1000
+iterations × 10 runs. Median of the run medians, milliseconds:
 
-So: **the warm model's value is proportional to what the framework boots, and on a real
-endpoint with real work in it, the per-request boot is a ~1 ms constant that both fast
-cold configurations and every warm one absorb.** This is the same conclusion hazard 27
-reached with a database query in the request — "the four arms converge" — reached here
-with a framework and a 10 KB response instead.
+| arm | `GET /` | `GET /items` | vs the warm arms |
+|---|---|---|---|
+| **P** stokehold worker (warm) | 0.362 | **0.617** | 1.00× |
+| **R** RoadRunner (warm) | 0.359 | **0.596** | 1.00× |
+| **F** nginx + php-fpm (cold) | 0.543 | 1.234 | 1.51× / **2.07×** |
+| **U** stokehold cold, unix (cold) | 0.656 | 1.466 | 1.83× / **2.38×** |
+| **T** stokehold cold, TCP (cold) | 0.663 | 1.656 | 1.85× / **2.68×** |
+
+Against `azera-competition`'s published `GET /items` for the same application
+(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.07×**, and on `GET /`
+(1.51× against a published 3.06×). So the effect is real, is in the published direction,
+and reproduces about two-thirds of its magnitude on this host.
+
+**The 1.00× in the throughput tables above is an artifact, and this is the lesson worth
+keeping.** A wrk sweep at 12-way concurrency keeps all 12 slots busy, so each request pays
+its own framework boot *while the other eleven are serving other requests* — the boot is
+overlapped away and the aggregate rate stops being sensitive to it. The published figure
+is a *latency* claim about one request, and only a sequential measurement can make it.
+Comparing a throughput ratio against a latency ratio is not comparing like with like; that
+is what the first version of this report did.
+
+The mechanism is also not what this report first claimed. The published 3.1–7.5× was
+described here as "an endpoint whose work is almost entirely container". Measured, the
+cold arms pay about **1.0 ms** of framework boot per request (7.2 ms on a cold opcache for
+a fresh pool, then 1.00 ms steady state, measured inside a warm php-cgi child). On
+`/items` that boot is ~two-thirds of the cold arm's 1.47 ms against the warm arm's 0.62 ms
+of work, which is exactly the ~2.4× observed. The ratio is the boot divided by the work —
+it is a property of the endpoint, and on this page the work is not negligible, so the
+ratio is ~2× rather than ~3×.
 
 ## What this says about the transport
 
-**`spawn_cgi` should not use loopback TCP on Linux.** On a 10 KB response it is 29×
-slower at concurrency 32 and 3.5× at concurrency 1, and its latency distribution shows
-why. Unused, it is the worst of both worlds: `spawn_cgi`+TCP has the piped worker's
-1.4× disadvantage on `/` *and* the transport collapse on `/items`. `socket = "unix:..."`
-exists for this reason and is worth far more than the loopback hop it was originally
-justified by.
+**The "T is 29× slower than U" result in the earlier version of this report was wrong, and
+the throughput tables above still show its cause.** It was measured with wrk at one
+connection; a single persistent client connection lands on one pool slot, so that slot
+serialises while the other eleven — and therefore the aggregate rate — are unaffected.
+What the sweep actually measures is one slot's behaviour, which is why T collapsed to
+198–281 rps while U did not: **the 59 ms tail is a single-connection phenomenon, not a
+general TCP penalty.**
 
-## The confound in this run, stated
+Stated correctly, from two independent measurements:
 
-The FPM arm's pool and the stokehold pool are configured to match on the model
-(`pm.max_children = 12` / `workers = 12`, `pm.max_requests = 0` / `max_requests = 0`) and
-the cold arms' opcache settings are verified identical **through a request**, not through
-the config file. One difference remains:
+- **Sequential latency** (`latency.php`, one connection, the same shape as the artifact):
+  T 1.656 ms vs U 1.466 ms on `/items` — **13%**, not 29×. On `/`, 0.663 vs 0.656 ms — 1%.
+- **Fresh connections** (sequential `curl`, no reuse): T and U were **identical**, 1.8 ms
+  each within noise.
 
-**php-fpm was reached through the framework's cold front controller, so its 7–8 ms
-container boot is the framework's; the FPM configuration therefore understates php-fpm
-relative to this project's own worker by the `azera-framework` boot alone.** The
-`/`-endpoint table, where the boot is the entire difference, is where that matters most.
-It does not affect the T/U transport finding, which holds the entry script constant.
+So on this host a unix socket is worth roughly **10%** on a large response and nothing on
+a small one or on a fresh connection. That is a real but modest advantage, and it is the
+honest justification for `socket = "unix:..."` — not the order of magnitude the first
+version of this report claimed. Loopback TCP's per-packet cost is real (measured in
+`ss`'s `minrtt` as 11 µs against 2 µs, so ~9 µs more per round trip) but a request pays
+only a handful of round trips.
 
-The larger confound is the one the first section names: the published dataset and this
-run measure different endpoints, and the endpoint's work is what sets the ratio. Neither
-number is wrong; they answer different questions.
+### A real bug found on the way, which was not the cause
+
+Per-connection `tcpdump` showed stokehold sending each FastCGI request as **8 separate TCP
+segments** — each 8-byte record header written individually — where nginx sends 1–2. The
+client sets `TCP_NODELAY`, so every `write` became its own segment, and php-cgi only sets
+`TCP_NODELAY` on its side *after* it reads the request, which is exactly the window
+stokehold's eight writes fall in.
+
+`Client::send` now assembles the request in a reused buffer and writes it once, with a
+test pinning the two framings to identical bytes. Measured before/after on the same
+methodology: **1.572 ms → 1.509 ms, about 4%.** So it was a genuine inefficiency and worth
+fixing, but it was not the cause of the 59 ms tail, and the first version of this report
+named it as the cause on the strength of a segment count rather than a measurement. The
+tail remains unexplained; it is single-connection-only and does not appear with fresh
+connections.
+
+## The confounds, stated
+
+**Why 2.07× here and 3.30× published, on the same application and the same route.** The
+ratio is the boot divided by the work, so it moves with the work. My warm arm does
+0.617 ms of work where the published RoadRunner row does 0.4647 ms — this page carries
+more per request (an ORM query and a 12 KB render against the published entry script's own
+mix), so the same ~1.0 ms boot is a smaller multiple of it. Neither figure is wrong: a
+ratio is only comparable between runs whose warm-arm cost is comparable, and these differ
+by ~33%. **Compare ratios only when the warm-arm cost matches; otherwise compare absolute
+milliseconds.**
+
+**The boot is the framework's, and every cold arm pays it.** All four cold arms reach the
+same entry script (`public/index.php`) and boot the same `BenchApp` the warm arms use; they
+differ only in *when* the boot happens. That is the experiment, not a confound — but it
+does mean the FPM and `spawn_cgi` arms both carry the `azera-framework` boot, so a faster
+framework boot would shrink every cold arm together and leave the ranking unchanged.
+
+**Host.** `azera-competition`'s published figures came from a different machine. Absolute
+milliseconds are not portable between the two; the direction and rough magnitude are.
+
+**Measured on a quiet host.** 12 cores, load 0.2, no other servers. The FPM arm's pool and
+the stokehold pool are matched on the model (`pm.max_children = 12` / `workers = 12`,
+`pm.max_requests = 0` / `max_requests = 0`), and the cold arms' opcache settings are verified
+identical **through a request** rather than through the config file.
 
 ## Everything that had to be fixed before these numbers were trustworthy
 

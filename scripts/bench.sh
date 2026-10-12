@@ -46,6 +46,11 @@ DUR="${DUR:-5s}"
 REPEAT="${REPEAT:-1}"
 ENDPOINTS="${ENDPOINTS:-/,/items}"
 SKIP_FPM="${SKIP_FPM:-0}"
+# Sequential per-request latency, the published methodology. Runs after the sweep
+# against the same servers. Set to 0 to skip (it adds about a minute per arm).
+LATENCY="${LATENCY:-1}"
+LAT_ITERS="${LAT_ITERS:-1000}"
+LAT_RUNS="${LAT_RUNS:-10}"
 
 PHP_CGI="$(command -v php-cgi || true)"
 PHP_FPM_BIN="$(command -v php-fpm8.3 || command -v php-fpm || true)"
@@ -76,6 +81,7 @@ FPM_SOCKET="$SOCKET_DIR/fpm.sock"
 FPM_POOL_CONF="/etc/php/8.3/fpm/pool.d/bench-stokehold.conf"
 NGINX_CONF="/etc/nginx/conf.d/bench-stokehold.conf"
 RESULTS="$RUNDIR/results.tsv"
+LATENCY_RESULTS="$RUNDIR/latency.tsv"
 
 fail() {
     echo "FATAL: $*" >&2
@@ -258,6 +264,39 @@ run_client() {
     done
 }
 
+# Sequential, one connection, hrtime() per request — the methodology the published
+# 3.1x figure came from, and a different question from the sweep above. A 12-slot
+# server at concurrency 1 has 11 idle slots, so a cell here is the cost of ONE
+# request; the sweep is the behaviour of a busy pool. Reporting only the sweep is
+# what let this project compare its numbers against published latency ratios without
+# noticing it was measuring something else.
+run_latency() {
+    local port="$1" label="$2" arm="$3"
+    [ "$LATENCY" = "1" ] || return 0
+    for ep in ${ENDPOINTS//,/ }; do
+        # The marker differs per endpoint, and the probe aborts rather than reporting
+        # a number when it is missing. `/` renders no item rows; `/items` does.
+        local marker="Azera"
+        case "$ep" in
+            /items*|*/items*) marker="Benchmark Item" ;;
+        esac
+        echo "  --- latency ($ep, $LAT_RUNS x $LAT_ITERS sequential) ---"
+        php "$SCRIPT_DIR/latency.php" "http://127.0.0.1:$port" "$ep" \
+            "$LAT_ITERS" "$LAT_RUNS" "$label" "$marker" 2>&1 | while IFS=$'\t' read -r l run med mean min p95 conn st; do
+            # The data's first field is the LABEL, which contains a space, so it must
+            # not be pattern-matched against a URL. Discriminate on the second field
+            # instead: a run number is data, anything else is a diagnostic line.
+            case "$run" in
+                '' | *[!0-9]*) echo "    $l $run $med" ; continue ;;
+            esac
+            printf "    run %-2s  median %7s ms  mean %7s ms  min %7s ms  p95 %7s ms (connect %s ms)\n" \
+                "$run" "$med" "$mean" "$min" "$p95" "$conn"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$arm" "seq" "$run" "$ep" "$label" "$med" "$min" "$p95" "$conn" >> "$LATENCY_RESULTS"
+        done
+    done
+}
+
 start_stokehold() {
     "$BIN" serve -c "$1" >"$RUNDIR/server-$2.log" 2>&1 &
     PID=$!
@@ -432,6 +471,7 @@ if [ -n "$newest" ]; then
 fi
 
 : > "$RESULTS"
+: > "$LATENCY_RESULTS"
 setup_fpm
 
 # ---------------------------------------------------------------------------
@@ -445,6 +485,7 @@ for arm in ${ARMS//,/ }; do
             start_stokehold "$RUNDIR/stoke-pipe.toml" pipe-p
             if wait_port "$ARM_PORT_P" && sanity "$ARM_PORT_P" P; then
                 run_client "$ARM_PORT_P" "P stokehold+worker(pipe)" P
+                run_latency "$ARM_PORT_P" "P stokehold+worker(pipe)" P
             else
                 echo "  ARM P not measured:"; tail -5 "$RUNDIR/server-pipe-p.log" 2>/dev/null
             fi
@@ -455,6 +496,7 @@ for arm in ${ARMS//,/ }; do
             start_stokehold "$RUNDIR/stoke-cgi-tcp.toml" cgi-t
             if wait_port "$ARM_PORT_T" && sanity "$ARM_PORT_T" T; then
                 run_client "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
+                run_latency "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
             else
                 echo "  ARM T not measured:"; tail -5 "$RUNDIR/server-cgi-t.log" 2>/dev/null
             fi
@@ -466,6 +508,7 @@ for arm in ${ARMS//,/ }; do
                 start_stokehold "$RUNDIR/stoke-cgi-unix.toml" cgi-u
                 if wait_port "$ARM_PORT_U" && sanity "$ARM_PORT_U" U; then
                     run_client "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
+                run_latency "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
                 else
                     echo "  ARM U not measured:"; tail -5 "$RUNDIR/server-cgi-u.log" 2>/dev/null
                 fi
@@ -481,6 +524,7 @@ for arm in ${ARMS//,/ }; do
                 RR_PID=$!
                 if wait_port "$ARM_PORT_R" && sanity "$ARM_PORT_R" R; then
                     run_client "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
+                run_latency "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
                 else
                     echo "  ARM R not measured:"; tail -8 "$RUNDIR/rr.log" 2>/dev/null
                 fi
@@ -493,6 +537,7 @@ for arm in ${ARMS//,/ }; do
             echo "ARM F: nginx + php-fpm (cold, unix socket)"
             if [ "$fpm_available" = "1" ] && wait_port "$ARM_PORT_F" && sanity "$ARM_PORT_F" F; then
                 run_client "$ARM_PORT_F" "F nginx+php-fpm(unix)" F
+                run_latency "$ARM_PORT_F" "F nginx+php-fpm(unix)" F
             else
                 echo "  ARM F not measured"
                 tail -5 /var/log/nginx-bench-error.log 2>/dev/null
