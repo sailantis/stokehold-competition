@@ -60,7 +60,34 @@ ARMS=P,T,U      bash scripts/bench.sh    # a subset
 CONC=1,4,8,16,32 REPEAT=3 bash scripts/bench.sh
 ENDPOINTS=/items  bash scripts/bench.sh  # the ORM page only
 SKIP_FPM=1       bash scripts/bench.sh
+CROSSOVER=1 CROSS_CONC=1,4,8,16 bash scripts/bench.sh
 ```
+
+## Three measurements, three questions
+
+The repository runs three passes, and reading the wrong one is the mistake this
+project made for several weeks:
+
+| pass | holds concurrency at | answers |
+|---|---|---|
+| `wrk` sweep | the slot count (12) | how many requests per second can this host push |
+| `latency.php` | 1 | what does one request cost, with nothing to overlap it |
+| `crossover.php` | a range, 1..16 | at what load does the model advantage disappear |
+
+They disagree, and both of the first two are right. A 12-slot sweep overlaps every
+request's framework boot with eleven other requests, so the boot vanishes from the
+aggregate rate; a single request gets no such help. The same pair of servers reads
+as **2.07x** and **1.00x** depending on which pass is asked. The crossover pass
+measures the middle and finds the advantage shrinking from 1.98x at concurrency 1
+to 1.63x at 16 — it does not cross over within the range this host can generate
+load for.
+
+The third pass exists because of a harness bug worth recording: the first version
+drove N handles from one process with `curl_multi` and reported concurrency 2 as
+*exactly* 2x the latency of concurrency 1, on three unrelated servers. That is the
+client, not the servers — `curl_multi_select($multi, 0.05)` takes seconds, so its
+retry floor was 50 ms. The current version runs N processes, each using the same
+blocking loop `latency.php` uses, and agrees with it to 0.1% at concurrency 1.
 
 ## What the harness refuses to do
 
@@ -72,10 +99,14 @@ that looked like findings. Every one of them is now a guard in `bench.sh`:
   would otherwise publish a plausible throughput figure for an arm that never ran
   the application. A cell that cannot be measured is recorded as `FAIL`, never as
   a zero.
-- **php-cgi gets the FPM pool's ini.** `opcache.enable_cli` is read by php-cgi and
-  ignored by php-fpm, and `xdebug.mode = develop` is on by default. Left alone,
-  the cold arms are compared under different rules and the gap measures
-  configuration rather than servers — measured at 3x on Laravel.
+- **Every arm runs the same PHP.** php-cgi is wrapped because `opcache.enable_cli`
+  is read by php-cgi and ignored by php-fpm, and the two warm arms are wrapped too
+  because a bare `php worker.php` is exposed to whatever the host's CLI happens to
+  have installed. That is not hypothetical: removing xdebug from this host's CLI
+  package roughly **doubled** the two warm arms (P 8,566 -> 16,322 rps, R 8,727 ->
+  18,265) while F, T and U did not move at all — the hazard-28 pattern, a
+  difference of ini mistaken for a difference of server, on the one pair nobody
+  had wrapped.
 - **A freshly modified checkout is waited out.** `opcache.file_update_protection`
   defaults to 2 seconds, and opcache refuses to cache a file whose mtime is newer.
   A script written seconds before measuring misses on every request *by design*,

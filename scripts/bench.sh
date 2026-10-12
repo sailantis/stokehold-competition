@@ -51,8 +51,16 @@ SKIP_FPM="${SKIP_FPM:-0}"
 LATENCY="${LATENCY:-1}"
 LAT_ITERS="${LAT_ITERS:-1000}"
 LAT_RUNS="${LAT_RUNS:-10}"
+# Per-request latency under concurrency — the crossover between the warm and cold
+# models. This is the measurement that answers "at what load does the resident worker
+# stop paying for itself", which neither the sweep nor the sequential pass can.
+CROSSOVER="${CROSSOVER:-1}"
+CROSS_CONC="${CROSS_CONC:-1,2,4,8,12,16}"
+CROSS_PER_HANDLE="${CROSS_PER_HANDLE:-400}"
+CROSS_RUNS="${CROSS_RUNS:-3}"
 
 PHP_CGI="$(command -v php-cgi || true)"
+PHP="$(command -v php || true)"
 PHP_FPM_BIN="$(command -v php-fpm8.3 || command -v php-fpm || true)"
 # The systemd unit is not always named after the binary: Debian/Ubuntu ship
 # `php8.3-fpm.service` for `/usr/sbin/php-fpm8.3`. Resolve it rather than
@@ -82,6 +90,7 @@ FPM_POOL_CONF="/etc/php/8.3/fpm/pool.d/bench-stokehold.conf"
 NGINX_CONF="/etc/nginx/conf.d/bench-stokehold.conf"
 RESULTS="$RUNDIR/results.tsv"
 LATENCY_RESULTS="$RUNDIR/latency.tsv"
+CROSSOVER_RESULTS="$RUNDIR/crossover.tsv"
 
 fail() {
     echo "FATAL: $*" >&2
@@ -123,12 +132,51 @@ exec $PHP_CGI -d opcache.enable_cli=1 \\
 WRAPPER
 chmod +x "$PHP_CGI_WRAPPER"
 
+# ---------------------------------------------------------------------------
+# The fair worker php. Arms P and R had no wrapper at all.
+#
+# php-cgi was wrapped and php-fpm's conf.d file was moved aside, but `php
+# worker.php` and `php roadrunner-worker.php` ran bare — so P and R were the only
+# two arms exposed to whatever the host's CLI PHP happened to have installed.
+#
+# That is not hypothetical. On this host xdebug was loaded for the CLI SAPI, and
+# after it was removed the two warm arms roughly doubled while F, T and U did not
+# move at all: P 8,566 -> 16,322 rps, R 8,727 -> 18,265, against F 8,552 -> 8,520
+# and T/U unchanged. A ~2x gap on exactly the arms that were not wrapped is
+# hazard 28's pattern (a difference of ini mistaken for a difference of server)
+# on the one pair nobody had protected.
+#
+# The wrapper pins what a benchmark should not be measuring — xdebug, opcache's
+# timestamp validation, and the memory limit — and pins them to the same values
+# the php-cgi wrapper and the FPM pool use, so every arm runs the same PHP.
+#
+# The extension check is deliberately a warning rather than a failure: the point
+# is that the ini is identical, and if the host has already removed xdebug there
+# is nothing to disable.
+# ---------------------------------------------------------------------------
+PHP_WORKER_WRAPPER="$RUNDIR/php-worker-bench"
+cat > "$PHP_WORKER_WRAPPER" <<WRAPPER
+#!/bin/sh
+exec $PHP -d opcache.enable_cli=1 \\
+    -d opcache.validate_timestamps=0 \\
+    -d xdebug.mode=off \\
+    -d memory_limit=512M "\$@"
+WRAPPER
+chmod +x "$PHP_WORKER_WRAPPER"
+if "$PHP" -m 2>/dev/null | grep -qi '^xdebug$'; then
+    echo "  NOTE: the CLI PHP has xdebug loaded; arms P and R run through"
+    echo "        $PHP_WORKER_WRAPPER, which asks for xdebug.mode=off."
+    echo "        A loaded xdebug cannot be switched off from an ini and costs"
+    echo "        roughly 2x (hazard 28), so prefer a host without it."
+fi
+
 stamp() {
     # stamp <template> <output> [ more sed args... ]
     local template="$1" output="$2"
     shift 2
     sed -e "s#{{ROOT}}#$ROOT#g" \
         -e "s#{{PHP_CGI}}#$PHP_CGI_WRAPPER#g" \
+        -e "s#{{PHP}}#$PHP_WORKER_WRAPPER#g" \
         -e "s#{{SOCKET_DIR}}#$SOCKET_DIR#g" \
         -e "s#{{SOCKET}}#$FPM_SOCKET#g" \
         -e "s#{{CGI_TCP_BASE}}#$CGI_TCP_BASE#g" \
@@ -293,6 +341,36 @@ run_latency() {
                 "$run" "$med" "$mean" "$min" "$p95" "$conn"
             printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                 "$arm" "seq" "$run" "$ep" "$label" "$med" "$min" "$p95" "$conn" >> "$LATENCY_RESULTS"
+        done
+    done
+}
+
+# Latency under N in flight. `latency.php` above holds N at 1, which is the case
+# where a cold arm pays its whole framework boot with nothing to overlap it. The
+# wrk sweep holds N at the slot count, which is the case where that boot is hidden
+# behind eleven other requests. Neither finds the concurrency at which one model
+# takes over from the other, and that is the number a deployment actually needs.
+run_crossover() {
+    local port="$1" label="$2" arm="$3"
+    [ "$CROSSOVER" = "1" ] || return 0
+    for ep in ${ENDPOINTS//,/ }; do
+        local marker="Azera"
+        case "$ep" in
+            /items*|*/items*) marker="Benchmark Item" ;;
+        esac
+        for c in ${CROSS_CONC//,/ }; do
+            php "$SCRIPT_DIR/crossover.php" "http://127.0.0.1:$port" "$ep" \
+                "$c" "$CROSS_PER_HANDLE" "$CROSS_RUNS" "$label" "$marker" 2>&1 \
+                | while IFS=$'\t' read -r l conc run med mean min p95 p99 rps st; do
+                case "$run" in
+                    '' | *[!0-9]*) echo "    $l $conc $run $med"; continue ;;
+                esac
+                printf "    conc %-3s run %-2s  median %8s ms  p95 %8s ms  p99 %8s ms  %9s rps  %s\n" \
+                    "$conc" "$run" "$med" "$p95" "$p99" "$rps" "$st"
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    "$arm" "$conc" "$run" "$ep" "$label" "$med" "$min" "$p95" "$p99" "$rps" "$st" \
+                    >> "$CROSSOVER_RESULTS"
+            done
         done
     done
 }
@@ -472,6 +550,7 @@ fi
 
 : > "$RESULTS"
 : > "$LATENCY_RESULTS"
+: > "$CROSSOVER_RESULTS"
 setup_fpm
 
 # ---------------------------------------------------------------------------
@@ -486,6 +565,7 @@ for arm in ${ARMS//,/ }; do
             if wait_port "$ARM_PORT_P" && sanity "$ARM_PORT_P" P; then
                 run_client "$ARM_PORT_P" "P stokehold+worker(pipe)" P
                 run_latency "$ARM_PORT_P" "P stokehold+worker(pipe)" P
+                run_crossover "$ARM_PORT_P" "P stokehold+worker(pipe)" P
             else
                 echo "  ARM P not measured:"; tail -5 "$RUNDIR/server-pipe-p.log" 2>/dev/null
             fi
@@ -497,6 +577,7 @@ for arm in ${ARMS//,/ }; do
             if wait_port "$ARM_PORT_T" && sanity "$ARM_PORT_T" T; then
                 run_client "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
                 run_latency "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
+                run_crossover "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
             else
                 echo "  ARM T not measured:"; tail -5 "$RUNDIR/server-cgi-t.log" 2>/dev/null
             fi
@@ -508,7 +589,8 @@ for arm in ${ARMS//,/ }; do
                 start_stokehold "$RUNDIR/stoke-cgi-unix.toml" cgi-u
                 if wait_port "$ARM_PORT_U" && sanity "$ARM_PORT_U" U; then
                     run_client "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
-                run_latency "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
+                    run_latency "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
+                    run_crossover "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
                 else
                     echo "  ARM U not measured:"; tail -5 "$RUNDIR/server-cgi-u.log" 2>/dev/null
                 fi
@@ -524,7 +606,8 @@ for arm in ${ARMS//,/ }; do
                 RR_PID=$!
                 if wait_port "$ARM_PORT_R" && sanity "$ARM_PORT_R" R; then
                     run_client "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
-                run_latency "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
+                    run_latency "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
+                    run_crossover "$ARM_PORT_R" "R roadrunner+worker(pipe)" R
                 else
                     echo "  ARM R not measured:"; tail -8 "$RUNDIR/rr.log" 2>/dev/null
                 fi
@@ -538,9 +621,9 @@ for arm in ${ARMS//,/ }; do
             if [ "$fpm_available" = "1" ] && wait_port "$ARM_PORT_F" && sanity "$ARM_PORT_F" F; then
                 run_client "$ARM_PORT_F" "F nginx+php-fpm(unix)" F
                 run_latency "$ARM_PORT_F" "F nginx+php-fpm(unix)" F
+                run_crossover "$ARM_PORT_F" "F nginx+php-fpm(unix)" F
             else
-                echo "  ARM F not measured"
-                tail -5 /var/log/nginx-bench-error.log 2>/dev/null
+                echo "  ARM F not measured"                tail -5 /var/log/nginx-bench-error.log 2>/dev/null
             fi
             ;;
         *)
@@ -572,13 +655,61 @@ END {
     # Sort on a numeric conc inside awk: the key is tab-separated and a shell sort
     # would order by arm name as a string first, putting the rows in an order that
     # does not read as a table.
+    #
+    # The key is arm + endpoint + concurrency, so these are a[1], a[2], a[3]. Printing
+    # them in a different order than this does not fail loudly — `%d` on the endpoint
+    # yields 0 and every row then reads "conc 0" with the concurrency in the arm column,
+    # while the rps and p50/p99 beside it stay correct, which is what makes it easy to
+    # publish without noticing.
     for (k in n) {
         split(k, a, "\t");
-        printf "%s\t%d\t%s\t%d\t%.0f\t%s\n", a[3], a[2] + 0, a[1], a[2], rps[k]/n[k], lat[k];
+        printf "%s\t%s\t%d\t%.0f\t%s\n", a[1], a[2], a[3] + 0, rps[k]/n[k], lat[k];
     }
-}' "$RESULTS" | sort -k1,1 -k2,2n -k3,3 | \
-    awk -F'\t' '{ printf "%-10s conc %-3s  %10.0f rps   p50/p99 per repeat:%s\n", $1, $4, $5, $6 }'
+}' "$RESULTS" | sort -k1,1 -k2,2 -k3,3n | \
+    awk -F'\t' '{ printf "%-10s %-7s conc %-3s  %10.0f rps   p50/p99 per repeat:%s\n", $1, $2, $3, $4, $5 }'
 echo
+# The crossover: per-request latency at each concurrency, so the point where the warm
+# model stops paying for itself is visible as a number rather than inferred from two
+# measurements taken at the two extremes.
+if [ -s "$CROSSOVER_RESULTS" ]; then
+    echo "=============================================================="
+    echo " latency under concurrency (median of $CROSS_RUNS runs, ms)"
+    echo "=============================================================="
+    # Median across runs per (arm, endpoint, conc). Averaging percentiles would be
+    # wrong for the same reason as above, so p95/p99 are shown only as the spread
+    # across runs of the median.
+    awk -F'\t' '
+    $11 == "ok" {
+        # $1 arm, $2 concurrency, $3 run, $4 endpoint. The key is arm+endpoint+conc so
+        # the runs of one cell are medianed together; using the run as the third key
+        # instead makes every run its own cell.
+        key = $1 "\t" $4 "\t" $2;
+        n[key]++; med[key] = med[key] " " $6 + 0;
+    }
+    END {
+        for (k in n) {
+            split(k, a, "\t");
+            cnt = split(med[k], v, " ");
+            # Insertion sort of a handful of numbers; `asort` is a gawk extension and
+            # this must run on whatever awk the host has.
+            for (i = 2; i <= cnt; i++) {
+                x = v[i]; j = i - 1;
+                while (j >= 1 && v[j] > x) { v[j+1] = v[j]; j--; }
+                v[j+1] = x;
+            }
+            m = (cnt % 2) ? v[(cnt+1)/2] : (v[cnt/2] + v[cnt/2+1]) / 2;
+            # Print arm, endpoint, concurrency, median. `a[1]` is the arm, `a[2]` the
+            # endpoint and `a[3]` the concurrency; passing them in a different order than
+            # they are named here does not fail loudly, it prints the arm as a number and
+            # every row reads "conc 0".
+            printf "%s\t%s\t%d\t%.3f\n", a[1], a[2], a[3] + 0, m;
+        }
+    }' "$CROSSOVER_RESULTS" | sort -k1,1 -k2,2 -k3,3n | \
+        awk -F'\t' '{ printf "  %-10s %-6s conc %-3s  %8.3f ms\n", $1, $2, $3, $4 }'
+    echo
+    echo "raw per-run crossover data: $CROSSOVER_RESULTS"
+    echo
+fi
 echo "raw per-repeat data: $RESULTS"
 echo "formatted report:    python3 scripts/report.py $RESULTS"
 

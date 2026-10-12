@@ -27,7 +27,10 @@ document_root = "{{ROOT}}/public"
 
 [backends.app]
 kind = "worker"
-command = "php {{ROOT}}/worker.php"
+# Wrapped by the harness: `php` as installed is not necessarily configured like the
+# other arms' PHP, and hazard 28 is the record of what that costs. See
+# `PHP_WORKER_WRAPPER` in scripts/bench.sh.
+command = "{{PHP}} {{ROOT}}/worker.php"
 workers = 12
 working_dir = "{{ROOT}}"
 max_requests = 0

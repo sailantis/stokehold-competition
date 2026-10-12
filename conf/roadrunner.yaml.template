@@ -22,7 +22,10 @@
 version: "3"
 
 server:
-  command: "php {{ROOT}}/roadrunner-worker.php"
+  # Wrapped by the harness for the same reason as ARM P: an unwrapped `php` exposes
+  # this arm to whatever the host's CLI PHP has installed, which is hazard 28's
+  # mistake with a different pair of arms.
+  command: "{{PHP}} {{ROOT}}/roadrunner-worker.php"
   relay: pipes
 
 http:

@@ -9,9 +9,16 @@ data/
 # Harness output. A published run's raw per-repeat data is a deliverable and is
 # committed (`results/raw.tsv`); everything else a run produces is per-host and
 # per-run scratch.
+#
+# The crossover and latency passes are also named deliverables: they are the two
+# passes that answer questions the sweep cannot, so their raw rows are kept alongside
+# the sweep's rather than treated as scratch.
 results/*.tsv
 !results/raw.tsv
+!results/crossover.tsv
+!results/latency.tsv
 results/*.log
+!results/run.log
 *.log
 
 # Editor / OS
