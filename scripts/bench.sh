@@ -233,6 +233,85 @@ finish() {
 }
 trap finish EXIT
 
+# --- the leak guard ---------------------------------------------------------
+#
+# A run that leaks php-cgi children corrupts the next one: hazard 28 left 68
+# orphans, each holding a port and competing for the cores under test. So every arm
+# is checked before the next one starts, and the run stops if a leak cannot be
+# cleared — the point is that a leak must not cross into an arm that is measured.
+#
+# THE PATTERN MATTERS MORE THAN THE COUNT, and the first version got it wrong in a
+# way that made the guard blind to the arms it guards. Arms T and U spawn PHP
+# through the `php-cgi-bench` wrapper, so a real child's argv is
+#
+#   /usr/bin/php-cgi -d opcache.enable_cli=1 ... -d memory_limit=512M -b 127.0.0.1:19300
+#
+# and the literal string "php-cgi -b" NEVER APPEARS in it. Measured on the bench
+# host: `pgrep -f 'php-cgi -b'` returned 0 while 12 of arm T's own children were
+# running. The reported "8 strays" were therefore leftovers from older configs that
+# invoked /usr/bin/php-cgi directly — not the arms under measurement — and the guard
+# would have reported clean through any leak the wrapper produced.
+#
+# Matching `-b` as its own word fixes that wherever the flag sits in the argv. Two
+# further constraints are deliberate:
+#
+#   * php-fpm's children are `php-fpm: pool www` and carry no `-b`, so a host that
+#     serves its own sites is never counted and never reaped. `pkill -x php-cgi`
+#     would be a different and unsafe thing.
+#   * `pgrep -c` exits 1 on no match, so `$(pgrep -c x || true)` can return two
+#     lines and make a string comparison against "0" fail for a clean run. Reading
+#     PIDs from `ps` and counting words has no such failure mode.
+#
+# `ps -eww` is required: without `-ww` the args column is truncated to the terminal
+# width, and a long wrapper command line would lose its `-b` and go uncounted.
+php_cgi_pids() {
+    ps -eww -o pid=,args= 2>/dev/null | awk '
+        /php-cgi/ && $0 !~ /awk/ {
+            for (i = 2; i <= NF; i++) if ($i == "-b") { print $1; break }
+        }'
+}
+
+count_php_cgi() {
+    php_cgi_pids | wc -w | tr -d " "
+}
+
+# SIGTERM first, because that is what a graceful pool shutdown does and what the
+# server itself sends; SIGKILL only for what ignores it.
+reap_php_cgi() {
+    local pids
+    pids="$(php_cgi_pids)"
+    [ -n "${pids// /}" ] || return 0
+    kill $pids 2>/dev/null
+    sleep 1
+    pids="$(php_cgi_pids)"
+    if [ -n "${pids// /}" ]; then
+        echo "  survivors after SIGTERM: $(php_cgi_pids | tr '\n' ' ')"
+        kill -9 $pids 2>/dev/null
+        sleep 1
+    fi
+    return 0
+}
+
+guard_arm() {
+    local arm="$1" n
+    n="$(count_php_cgi)"
+    if [ "$n" = "0" ]; then
+        echo "  leak check [$arm]: clean"
+        return 0
+    fi
+    echo "  leak check [$arm]: $n php-cgi left behind, reaping"
+    reap_php_cgi
+    n="$(count_php_cgi)"
+    if [ "$n" != "0" ]; then
+        echo "  leak check [$arm]: FAILED - $n survived SIGTERM and SIGKILL"
+        echo "  argv: $(ps -eww -o args= -p $(php_cgi_pids | tr '\n' ',' | sed 's/,$//') 2>/dev/null | head -1)"
+        echo "  refusing to continue: the next arm would be measured against a leaked pool"
+        exit 1
+    fi
+    echo "  leak check [$arm]: cleared"
+    return 0
+}
+
 wait_port() {
     for _ in $(seq 1 160); do
         curl -s -o /dev/null "http://127.0.0.1:$1/" 2>/dev/null && return 0
@@ -630,6 +709,10 @@ for arm in ${ARMS//,/ }; do
             echo "  unknown arm '$arm', skipping"
             ;;
     esac
+
+    # Before the next arm is set up. `stop_arm` runs immediately before this in every
+    # branch, so anything still alive here is a genuine leak and not a slow teardown.
+    guard_arm "$arm"
     echo
 done
 
@@ -716,15 +799,15 @@ echo "formatted report:    python3 scripts/report.py $RESULTS"
 # A run that leaves processes behind corrupts the next one: hazard 28's 68 orphaned
 # php-cgi children each held a port and competed for the cores under test.
 #
-# The check has to count the right things. `pgrep -c` exits 1 when it matches
-# nothing, so a bare `$(pgrep -c x || echo 0)` can print TWO lines ("0" from the
-# failed pgrep and "0" from the echo), which makes a string comparison against "0"
-# fail for a clean run. And matching on `php-cgi` counts the host's own
-# php-fpm-managed children, which belong to php-fpm and not to this run.
-count_strays() {
-    echo "$(pgrep -c -f 'php-cgi -b' 2>/dev/null || true)" | head -1
-}
-strays="$(count_strays)"
-[ -n "$strays" ] || strays=0
+# The per-arm check above is what makes a leak impossible to carry into a measured
+# arm. This final one is kept because it is the only check that also runs on the
+# paths that leave no arm behind, and because a run that reports "clean" at the end
+# is easier to trust than one that only reports nothing.
+strays="$(count_php_cgi)"
 echo "stray php-cgi pools after teardown: $strays"
-[ "$strays" = "0" ] || echo "  WARNING: a pool leaked; kill them before the next run"
+if [ "$strays" != "0" ]; then
+    echo "  argv: $(ps -eww -o args= -p $(php_cgi_pids | tr '\n' ',' | sed 's/,$//') 2>/dev/null | head -3)"
+    echo "  WARNING: a pool leaked; kill them before the next run"
+    reap_php_cgi
+    echo "  after reaping: $(count_php_cgi)"
+fi

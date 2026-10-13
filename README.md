@@ -322,9 +322,25 @@ that looked like findings. Every one of them is now a guard in `bench.sh`:
 - **RoadRunner is stopped by config path, not binary path.** Its argv is
   `./rr serve`, so a `pkill` on the resolved binary matches nothing and the worker
   survives into the next run holding its port.
-- **Leftovers are reported.** A run that leaks a php-cgi pool corrupts the next
-  one; one earlier host accumulated 68 orphans, each holding a port and competing
-  for the cores under test.
+- **Leftovers are caught *per arm*, and the pattern had to be fixed to see them.**
+  A run that leaks a php-cgi pool corrupts the next one; one earlier host
+  accumulated 68 orphans, each holding a port and competing for the cores under
+  test. Every arm is now checked immediately after `stop_arm` and the run refuses
+  to continue if a leak cannot be cleared, so a leak can never cross into an arm
+  that is measured.
+  The check had been worse than useless as written: it matched the literal string
+  `php-cgi -b`, but arms T and U spawn PHP through the `php-cgi-bench` wrapper, whose
+  argv inserts its `-d` flags *before* `-b` —
+  `/usr/bin/php-cgi -d opcache.enable_cli=1 … -b 127.0.0.1:19300` — so the pattern
+  matched **0** of the 12 children a running arm actually had. Measured on the bench
+  host: `pgrep -f 'php-cgi -b'` returned 0 while twelve children were alive, and it
+  still returned 0 after a `kill -9` of the server left all twelve orphaned. The
+  reported "8 strays" were therefore leftovers from older configs that invoked
+  `/usr/bin/php-cgi` directly, and the guard would have reported clean through any
+  leak the arms under measurement produced. It now matches `-b` as its own word via
+  `ps -eww` (the `-ww` is load-bearing: without it a long wrapper command line is
+  truncated and loses the flag), which never matches php-fpm's `php-fpm: pool www`
+  children — so a host serving its own sites is neither counted nor reaped.
 - **`max_requests = 0` means never recycle.** It is written explicitly in the
   configurations because it is what a real php-fpm pool carries — and because
   reading it as "recycle after every request" is a mistake this project has
