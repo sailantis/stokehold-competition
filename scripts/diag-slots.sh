@@ -164,7 +164,13 @@ binary_of() {
 # port and a stale process can never be mistaken for the current one. The port follows
 # the variant's index in the list, which is the same order the rotation walks.
 port_of() { echo "$((PORT + $(index_of "$1")))"; }
-config_of() { case "$1" in rr) echo "$DIR/rr.yaml" ;; *) echo "$DIR/$1.toml" ;; esac; }
+config_of() {
+    case "$1" in
+        --sweep) echo "$DIR/worker.toml" ;;
+        rr) echo "$DIR/rr.yaml" ;;
+        *) echo "$DIR/$1.toml" ;;
+    esac
+}
 
 write_variant_config() {
     local variant="$1" port="$2" file="$3"
@@ -332,8 +338,26 @@ wait_port() {
     return 1
 }
 
-printf 'variant\tworkers\tconc\tthreads\tround\trps\tp50\tp99\tserved\tmean_wait_us\twait_p50_us\twait_p99_us\tbusiest\tbusiest_wait_us\n' \
-    > "$RESULTS"
+if [ "$NVARIANTS" -eq 1 ] && [ "${VARIANT_LIST[0]}" = "--sweep" ]; then
+    SWEEP_MODE=1
+else
+    SWEEP_MODE=0
+fi
+
+if [ "$SWEEP_MODE" = "1" ]; then
+    # The original column layout, kept byte-compatible with the committed slot-wait rows
+    # (`slot-waits-A.tsv`, `-B.tsv`, `-fair-A.tsv`, `-fair-B.tsv`). A parser that reads by
+    # position rather than by header name would silently shift if these columns moved, and
+    # the report quotes those files.
+    printf 'workers\tconc\tthreads\trepeat\trps\tp50\tp99\tserved\tmean_wait_us\twait_p50_us\twait_p99_us\tbusiest\tbusiest_wait_us\n' \
+        > "$RESULTS"
+else
+    # A/B mode prepends the variant and renames `repeat` to `round`, because in this mode a
+    # row's repeat index is the round it was measured in and the round is what the ratio is
+    # computed within.
+    printf 'variant\tworkers\tconc\tthreads\tround\trps\tp50\tp99\tserved\tmean_wait_us\twait_p50_us\twait_p99_us\tbusiest\tbusiest_wait_us\n' \
+        > "$RESULTS"
+fi
 
 if [ "$NVARIANTS" -eq 1 ] && [ "${VARIANT_LIST[0]}" = "--sweep" ]; then
     echo "diag-slots: $WORKERS worker(s), concurrency $CONC held fixed, threads $THREADS"
@@ -444,11 +468,19 @@ run_measurement() {
     busiest="$(word_after "$line" 'slot')"
     busiest_us="$(word_after "$line" 'at')"
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-        "$variant" "$WORKERS" "$CONC" "$threads" "$round" \
-        "$rps" "$p50" "$p99" \
-        "${served:-?}" "${mean:-?}" "${wait_p50:-?}" "${wait_p99:-?}" \
-        "${busiest:-?}" "${busiest_us:-?}" >> "$RESULTS"
+    if [ "$SWEEP_MODE" = "1" ]; then
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "$WORKERS" "$CONC" "$threads" "$round" \
+            "$rps" "$p50" "$p99" \
+            "${served:-?}" "${mean:-?}" "${wait_p50:-?}" "${wait_p99:-?}" \
+            "${busiest:-?}" "${busiest_us:-?}" >> "$RESULTS"
+    else
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "$variant" "$WORKERS" "$CONC" "$threads" "$round" \
+            "$rps" "$p50" "$p99" \
+            "${served:-?}" "${mean:-?}" "${wait_p50:-?}" "${wait_p99:-?}" \
+            "${busiest:-?}" "${busiest_us:-?}" >> "$RESULTS"
+    fi
 
     printf "  r%-2s %-9s t=%-4s  %10s rps  p50 %8s  p99 %8s" \
         "$round" "$variant" "$threads" "$rps" "$p50" "$p99"
