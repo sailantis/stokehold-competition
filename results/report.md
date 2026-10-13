@@ -671,6 +671,53 @@ that there *is* something to fix, that it is in `pick_slot`, and that it is wort
 latency and a 16 ms p99 at c=32 — which is enough to justify the work that a hypothesis alone
 was not.
 
+#### The fair queue, built and measured
+
+The free list was chosen over `try_lock` for a reason the data already implied: **the mean wait is
+structural.** 32 clients against 12 workers at ~600 µs each means ~20 requests in flight beyond
+the workers, and no scheduling change removes that time — it is Little's law, and it is why the
+two sweeps above agree on ~900 µs at c=32 despite being otherwise different experiments. What a
+fix *can* change is who that time is charged to. `try_lock` scanning for a free slot is a race
+rather than a fairness mechanism, and at c=32, where the damage is, all twelve slots are usually
+busy — there is little free to skip to. The fair queue makes a request wait for the slot it will
+actually use. `pick_slot`, the cursor and the healthy-not-free test are gone, replaced by a lease
+(stokehold `e2b031e`).
+
+Same two sweeps, on the idle host, three repeats per level:
+
+| concurrency | rps before → after | client p50 | client p99 | pool mean wait | pool p99 wait |
+|---|---|---|---|---|---|
+| 12 | 15,686 → 16,342 (**+4.2%**) | 0.71 → 0.69 ms | 1.68 → 1.41 ms (−16%) | 34 → 0 µs | 1.02 → 0.008 ms |
+| 16 | 17,548 → 19,884 (**+13.3%**) | 0.79 → 0.75 ms | 3.94 → 1.57 ms (−60%) | 157 → 30 µs | 2.05 → 0.51 ms |
+| 20 | 18,581 → 22,114 (**+19.0%**) | 0.88 → 0.85 ms | 7.68 → 1.78 ms (−77%) | 325 → 123 µs | 8.19 → 1.02 ms |
+| 24 | 18,799 → 22,787 (**+21.2%**) | 0.97 → 0.99 ms | 10.74 → 2.24 ms (−79%) | 509 → 271 µs | 8.19 → 2.05 ms |
+| 32 | 18,982 → 22,360 (**+17.8%**) | 1.16 → 1.35 ms | 18.98 → 3.68 ms (−81%) | 906 → 625 µs | 16.4 → 4.10 ms |
+
+Three things there go beyond what was predicted, and the first is the one to be careful about.
+
+- **Nothing was shed to achieve it.** A bounded queue that refuses under load would look exactly
+  like a tail improvement while quietly converting throughput into 503s, so this was checked
+  directly: `wrk` reports non-2xx responses as an explicit line and printed **none** at c=16, 24
+  or 32, and the server logged no refusal. Every response counted above was a success.
+- **Throughput rose too, by 13–21%.** That was not the goal and was not predicted. It is
+  consistent with the mechanism: the old scan did real work under contention — locking each
+  candidate, calling `try_wait` on each, and at c=32 walking the whole array before blocking on
+  one slot — and that work is paid per request, on 12 cores, 19,000 times a second. A free list
+  pop costs about what an uncontended mutex costs.
+- **The median cost far less than predicted.** The estimate was p50 rising from 1.16 ms to
+  ~1.5–1.7 ms at c=32 as the mean got shared out; it went to 1.35 ms. Right direction, too
+  pessimistic, and the likely reason is that a fair queue also produces 40% fewer requests that
+  spend time waiting at all, so there is less total queueing to share out.
+
+The trade that *was* expected did occur: **at c=32 the median is 16% worse** while the p99 is 81%
+better. That is the fairness doing what it was approved to do — the request that would have been
+served on contact now shares the queue — and it is confined to the range where there is something
+to share, because at c=12 the median is slightly *better*.
+
+RoadRunner for contrast, from the dense sweep: at c=24 it measured 2.70 ms p99 with a 1.23 ms
+median. The fair queue gets 2.24 ms p99 with a 0.99 ms median — better on both, which is the first
+time this project has been able to say that about the tail.
+
 ## The crossover — latency under concurrency
 
 The table above holds concurrency at 1 and the sweep holds it at 12. Neither answers the

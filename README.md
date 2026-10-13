@@ -437,6 +437,25 @@ tables above moves, and throughput at c=24 is already 4% ahead. What is no longe
 the tail is real or whose it is. What *is* still open is which fix: `try_lock` in the scan, or a
 real fair queue. Both are consistent with this data and neither has been built or compared.
 
+**Built: the fair queue, and it holds.** `pick_slot`, the cursor and the healthy-not-free test are
+gone, replaced by a lease taken from a free list — a slot cannot be leased twice, so a request now
+waits for the slot it will actually use rather than for whichever worker the cursor happened to
+point at. Same sweeps, same host:
+
+| concurrency | rps | client p50 | client p99 | pool mean wait |
+|---|---|---|---|---|
+| 12 | 15,686 → 16,342 (+4%) | 0.71 → 0.69 ms | 1.68 → 1.41 ms | 34 → 0 µs |
+| 20 | 18,581 → 22,114 (+19%) | 0.88 → 0.85 ms | 7.68 → 1.78 ms | 325 → 123 µs |
+| 32 | 18,982 → 22,360 (+18%) | 1.16 → 1.35 ms | 18.98 → 3.68 ms | 906 → 625 µs |
+
+Three notes, because two of these were not the point. **Nothing was shed**: `wrk` prints non-2xx
+responses as its own line and printed none, so the gain is real service rather than `503`s. The
+**throughput rise of 13–21% was not predicted** — the old scan locked and `try_wait`-ed each
+candidate per request, which is CPU on 12 cores at 19,000 rps — and an unpredicted win is worth
+re-measuring rather than celebrating. And the **median at c=32 is 16% worse**, which is the trade
+that was approved: the request that would have been served on contact now shares the queue. At c=12
+it is slightly better, so the cost is confined to the range where there is something to share.
+
 ## What the harness refuses to do
 
 The earlier experiments in this project produced numbers that were wrong in ways
