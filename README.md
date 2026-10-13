@@ -473,8 +473,10 @@ measured cells, 0 discarded, after a discarded warm-up pass per round:
 The spread never crosses 1.00 and all 14 paired comparisons point the same way. The control is what
 makes it legible: the **pre-fair binary still measures +3.0%/+5.7% over RoadRunner**, the same band
 hazard 51's interleaved A/B established for it, while the current build sits at +27%/+30%. So the
-blocked layout *understated* the gain, and this is the second largest single effect measured here,
-behind the `crc32c` fix. The pool's p99 halves twice over as well (10.92 → 2.19 ms at c=24, 17.44 → 3.47 ms at
+blocked layout *understated* the gain, and this is the largest throughput effect this project's own
+code has produced — larger than the `crc32c` fix's +10–16%, which was called *"the whole lead"* over
+RoadRunner. The two effects larger than it are not stokehold's: removing xdebug from the host's CLI
+PHP doubled the warm arms, and that was a configuration bug. The pool's p99 halves twice over as well (10.92 → 2.19 ms at c=24, 17.44 → 3.47 ms at
 c=32) *while* the mean wait falls (522 → 263 µs), and the p50 rises from 8 µs to 256 µs — the fairness
 made visible, the request served on contact now waiting a little so the unlucky one does not wait
 10 ms. `run_measurement` now fails loudly on any `Non-2xx` line, so a future run cannot quietly trade

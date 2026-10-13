@@ -743,8 +743,12 @@ same way. The control confirms it is stokehold that moved rather than the host: 
 for that binary in the interleaved A/B at the top of this report (+4.2% and +7.0% here, and −1.7% in
 the one `/items` c=16 cell of that pass)** — while the current build sits at +27% and +30%. The old
 build still lands exactly where it always did; the new one is 23–25% above it. So the blocked layout
-*understated* the gain, and the fair queue is not a few-percent scheduling change: it is the second
-largest single effect this repository has measured, behind only the `crc32c` fix.
+*understated* the gain, and the fair queue is the largest throughput effect this repository has
+measured — larger than the `crc32c` fix's +10–16%, which was called *"the whole lead"* over
+RoadRunner; the fix made stokehold 4–7% faster than RoadRunner, this makes it 27–30%. The one larger
+effect measured here is not this project's code, and is not even a result: removing xdebug from the
+host's CLI PHP doubled the warm arms (8,566 → 16,329 rps, +91%), which was a configuration bug that
+made one arm measure the host rather than the server.
 
 The pool's own columns move with the throughput rather than against it. Median over the seven
 rounds, measured inside the server:
