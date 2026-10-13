@@ -739,12 +739,12 @@ Per-round ratios, so the claim can be checked rather than believed:
 
 The spread never crosses 1.00 at either level, and every one of the 14 paired comparisons is the
 same way. The control confirms it is stokehold that moved rather than the host: on the same rounds
-**the pre-fair binary measured +3.0% and +5.7% over RoadRunner — the same figure the crc32c fix
-established for it in the interleaved A/B at the top of this report (`+3.3% … +7.0%`)** — while the
-current build sits at +27% and +30%. The old build still lands exactly where it always did; the new
-one is 23–25% above it. So the blocked layout *understated* the gain, and the fair queue is not a
-few-percent scheduling change: it is the second largest single effect this repository has measured,
-behind only the `crc32c` fix.
+**the pre-fair binary measured +3.0% and +5.7% over RoadRunner — the same band hazard 51 established
+for that binary in the interleaved A/B at the top of this report (+4.2% and +7.0% here, and −1.7% in
+the one `/items` c=16 cell of that pass)** — while the current build sits at +27% and +30%. The old
+build still lands exactly where it always did; the new one is 23–25% above it. So the blocked layout
+*understated* the gain, and the fair queue is not a few-percent scheduling change: it is the second
+largest single effect this repository has measured, behind only the `crc32c` fix.
 
 The pool's own columns move with the throughput rather than against it. Median over the seven
 rounds, measured inside the server:
