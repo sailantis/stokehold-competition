@@ -110,11 +110,11 @@ Everything below is the detail behind that table.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 3,268 | 12,969 | 23,277 | 34,393 | 36,008 |
-| **R** | RoadRunner | warm worker, pipe | 2,998 | 11,143 | 19,729 | 33,462 | 35,512 |
-| **F** | nginx + php-fpm | cold, unix socket | 1,822 | 6,503 | 11,638 | 18,365 | 17,960 |
-| **U** | stokehold | cold, unix socket | 1,570 | 5,631 | 9,419 | 14,396 | 16,125 |
-| **T** | stokehold | cold, loopback TCP | 1,533 | 5,865 | 9,736 | 14,212 | 16,743 |
+| **P** | stokehold | warm worker, pipe | 3,268 | 12,970 | 23,278 | 34,394 | 36,008 |
+| **R** | RoadRunner | warm worker, pipe | 2,999 | 11,143 | 19,730 | 33,462 | 35,513 |
+| **F** | nginx + php-fpm | cold, unix socket | 1,823 | 6,504 | 11,638 | 18,365 | 17,960 |
+| **U** | stokehold | cold, unix socket | 1,571 | 5,631 | 9,419 | 14,397 | 16,126 |
+| **T** | stokehold | cold, loopback TCP | 1,534 | 5,866 | 9,736 | 14,212 | 16,744 |
 
 Ratios at c=32: **P/F 2.00×**, **R/F 1.98×**, **T/U 1.04×**.
 
@@ -129,11 +129,11 @@ comes from not booting the framework, not from the pipe.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 1,789 | 6,892 | 11,522 | 16,696 | 18,655 |
-| **R** | RoadRunner | warm worker, pipe | 1,726 | 6,535 | 10,956 | 17,189 | 17,804 |
-| **F** | nginx + php-fpm | cold, unix socket | 808 | 3,049 | 5,429 | 8,412 | 8,325 |
-| **U** | stokehold | cold, unix socket | 653 | 2,696 | 4,616 | 7,240 | 8,179 |
-| **T** | stokehold | cold, loopback TCP | 650 | 2,838 | 4,736 | 7,014 | 8,014 |
+| **P** | stokehold | warm worker, pipe | 1,790 | 6,893 | 11,523 | 16,696 | 18,655 |
+| **R** | RoadRunner | warm worker, pipe | 1,727 | 6,535 | 10,957 | 17,190 | 17,804 |
+| **F** | nginx + php-fpm | cold, unix socket | 808 | 3,049 | 5,430 | 8,412 | 8,325 |
+| **U** | stokehold | cold, unix socket | 654 | 2,696 | 4,616 | 7,240 | 8,179 |
+| **T** | stokehold | cold, loopback TCP | 651 | 2,838 | 4,736 | 7,015 | 8,014 |
 
 Ratios at c=32: **P/F 2.24×**, **R/F 2.14×**, **T/U 0.98×**.
 
