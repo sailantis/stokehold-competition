@@ -718,6 +718,60 @@ RoadRunner for contrast, from the dense sweep: at c=24 it measured 2.70 ms p99 w
 median. The fair queue gets 2.24 ms p99 with a 0.99 ms median — better on both, which is the first
 time this project has been able to say that about the tail.
 
+#### The gain re-measured interleaved, and it is larger
+
+The before/after table above is a blocked layout, and the +13–21% in it was the one number there that
+the data could not settle on its own: a host that drifts charges the drift to whichever build ran
+last, and this repository has already published a **22% "effect" that reversed sign** the moment two
+binaries were interleaved instead of blocked (hazard 49). So the same two binaries were rebuilt and
+measured again inside a single round — `diag-slots.sh` in its A/B mode, both builds started in
+rotating order, RoadRunner included as a control that shares no code with either. 7 rounds × 3
+variants × 2 concurrency levels = **42 measured cells, 0 discarded**, after a discarded warm-up pass
+per round so that the first variant of round 1 pays for the cold binary and cold fs cache only in a
+row that is thrown away.
+
+Per-round ratios, so the claim can be checked rather than believed:
+
+| concurrency | new / pre-fair | spread over 7 rounds | new / RoadRunner | pre-fair / RoadRunner |
+|---|---|---|---|---|
+| **c=24** | **1.245× (+24.5%)** | 1.223–1.271 | 1.272× (+27.2%) | 1.030× (+3.0%) |
+| **c=32** | **1.229× (+22.9%)** | 1.197–1.244 | 1.302× (+30.2%) | 1.057× (+5.7%) |
+
+The spread never crosses 1.00 at either level, and every one of the 14 paired comparisons is the
+same way. The control confirms it is stokehold that moved rather than the host: on the same rounds
+**the pre-fair binary measured +3.0% and +5.7% over RoadRunner — the same figure the crc32c fix
+established for it in the interleaved A/B at the top of this report (`+3.3% … +7.0%`)** — while the
+current build sits at +27% and +30%. The old build still lands exactly where it always did; the new
+one is 23–25% above it. So the blocked layout *understated* the gain, and the fair queue is not a
+few-percent scheduling change: it is the second largest single effect this repository has measured,
+behind only the `crc32c` fix.
+
+The pool's own columns move with the throughput rather than against it. Median over the seven
+rounds, measured inside the server:
+
+| concurrency | build | mean wait | wait p50 | wait p99 | client p50 | client p99 |
+|---|---|---|---|---|---|---|
+| c=24 | pre-fair | 522 µs | 8 µs | 8,192 µs | 1.00 ms | **10.92 ms** |
+| c=24 | **fair** | 263 µs | 256 µs | **2,048 µs** | 0.98 ms | **2.19 ms** |
+| c=32 | pre-fair | 887 µs | 64 µs | 16,384 µs | 1.21 ms | **17.44 ms** |
+| c=32 | **fair** | 587 µs | 1,024 µs | **4,096 µs** | 1.28 ms | **3.47 ms** |
+
+Three things to read there. **The p99 halves twice over** (10.92 → 2.19 ms at c=24, 17.44 → 3.47 ms at
+c=32), and it does so *while* the mean wait falls (522 → 263 µs). **The p50 rises**, from 8 µs to
+256 µs, which is the fairness being visible: the request that used to be served on contact now
+shares the queue, so it waits a little and the unlucky request no longer waits 10 ms. And the client
+p50 at c=32 pays 0.07 ms for it (1.21 → 1.28 ms) — the same trade the blocked sweep showed, at less
+cost.
+
+**Nothing was shed to achieve any of it.** A bounded queue that refuses under load would look
+exactly like this while quietly converting throughput into 503s, so the check was run against this
+binary directly rather than inferred from the log: three 8-second runs at c=24 with `wrk`'s full
+summary printed, and **no `Non-2xx` line, no `Socket errors` line, in any of them** — 232,751 /
+233,591 / 235,206 successful requests, ~23,100 rps, with the server logging no refusal. The pool has
+a 500 ms slot-wait ceiling and it never reached it. Raw rows: `results/slot-waits-fair-ab-c24.tsv`
+and `-c32.tsv`, the run's full output in `slot-waits-fair-ab-run.log`, reproducible with
+`scripts/diag-slots.sh` (`VARIANTS=new,prefair,rr`) and `scripts/slots-report.py`.
+
 ## The crossover — latency under concurrency
 
 The table above holds concurrency at 1 and the sweep holds it at 12. Neither answers the

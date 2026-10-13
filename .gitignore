@@ -44,12 +44,18 @@ results/*.tsv
 # The slot-wait rows are a named deliverable too, and for the same reason: they are the
 # pool's own account of how long requests waited for a slot, measured inside the server so
 # that the client cannot be blamed for them. They are what turns "the tail is probably the
-# queue" into an answer, and the report's table is derived from them.
+# queue" into an answer, and the report's table is derived from them. The `-ab-` pair is the
+# same measurement interleaved — two builds inside one rotating round, RoadRunner as the
+# control — which is the only layout that can settle the fair queue's throughput gain.
 !results/slot-waits.tsv
 !results/slot-waits-*.tsv
 results/*.log
 !results/run.log
 *.log
+# Un-ignored *last*, because a later line wins in gitignore: the interleaved A/B's console
+# output, kept beside the rows it produced. It holds the per-cell pool lines and both reports,
+# so the TSVs beside it are not a number without a provenance.
+!results/slot-waits-fair-ab-run.log
 
 # Editor / OS
 .idea/

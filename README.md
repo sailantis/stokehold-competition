@@ -265,6 +265,7 @@ project made for several weeks:
 | `crossover.php` | a range, 1..16 | at what load does the model advantage disappear |
 | `diag-split.sh` / `diag-checksum.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
 | `diag-slots.sh` | 32, with the thread count varied | is the tail the pool's queueing or the load generator's |
+| `diag-slots.sh` (A/B mode) | 24 and 32, every variant inside one round | did the pool fix really buy what a blocked run said |
 
 They disagree, and the first two are both right. A 12-slot sweep overlaps every
 request's framework boot with eleven other requests, so the boot vanishes from the
@@ -456,6 +457,29 @@ re-measuring rather than celebrating. And the **median at c=32 is 16% worse**, w
 that was approved: the request that would have been served on contact now shares the queue. At c=12
 it is slightly better, so the cost is confined to the range where there is something to share.
 
+**Re-measured interleaved, because that unpredicted win is exactly the kind of number this
+repository has learned not to trust.** A blocked before/after charges host drift to whichever build
+ran last — the trap that once produced a 22% "effect" that reversed sign when the two binaries were
+interleaved instead (hazard 49). So both builds were measured again inside the same round in rotating
+order, with RoadRunner as a control that shares no code with either: `diag-slots.sh` gained an A/B
+mode and `scripts/slots-report.py` reads it. 7 rounds × 3 variants × 2 concurrency levels = 42
+measured cells, 0 discarded, after a discarded warm-up pass per round:
+
+| concurrency | new / pre-fair | spread over 7 rounds | new / RoadRunner | pre-fair / RoadRunner |
+|---|---|---|---|---|
+| c=24 | **1.245× (+24.5%)** | 1.223–1.271 | 1.272× | 1.030× |
+| c=32 | **1.229× (+22.9%)** | 1.197–1.244 | 1.302× | 1.057× |
+
+The spread never crosses 1.00 and all 14 paired comparisons point the same way. The control is what
+makes it legible: the **pre-fair binary still measures +3.0%/+5.7% over RoadRunner**, the same figure
+the `crc32c` A/B established for it, while the current build sits at +27%/+30%. So the blocked layout
+*understated* the gain, and this is the second largest single effect measured here, behind the
+`crc32c` fix. The pool's p99 halves twice over as well (10.92 → 2.19 ms at c=24, 17.44 → 3.47 ms at
+c=32) *while* the mean wait falls (522 → 263 µs), and the p50 rises from 8 µs to 256 µs — the fairness
+made visible, the request served on contact now waiting a little so the unlucky one does not wait
+10 ms. `run_measurement` now fails loudly on any `Non-2xx` line, so a future run cannot quietly trade
+throughput for `503`s.
+
 ## What the harness refuses to do
 
 The earlier experiments in this project produced numbers that were wrong in ways
@@ -541,6 +565,8 @@ scripts/bench.sh        the harness
 scripts/diag-split.sh   CPU per request: server process vs PHP workers
 scripts/diag-profile.sh perf record on the server process, flat symbol report
 scripts/diag-slots.sh   the pool's own slot-wait histogram vs the client's p99
+                        (VARIANTS=a,b,rr adds a rotated interleaved A/B of two builds)
+scripts/slots-report.py reads an interleaved diag-slots.sh run: within-round ratios
 results/                published numbers
 ```
 
