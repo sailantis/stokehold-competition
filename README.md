@@ -263,7 +263,7 @@ project made for several weeks:
 | `wrk` sweep | the slot count (12) | how many requests per second can this host push |
 | `latency.php` | 1 | what does one request cost, with nothing to overlap it |
 | `crossover.php` | a range, 1..16 | at what load does the model advantage disappear |
-| `diag-split.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
+| `diag-split.sh` / `diag-checksum.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
 
 They disagree, and the first two are both right. A 12-slot sweep overlaps every
 request's framework boot with eleven other requests, so the boot vanishes from the
@@ -284,6 +284,13 @@ named three functions, each of which made a full pass over the response body per
 request, and fixing them took the front-end from 413 µs to 137 µs — now cheaper
 than RoadRunner's 153 µs, and enough to put stokehold ahead end to end.
 
+That last claim is the one worth re-checking, and a **fifth pass exists to check it**.
+A blocked sweep measures one arm at a time, so a host that drifts over twenty minutes
+charges that drift to whichever arm ran last. `ab-perf.sh` measures every variant
+inside the same round with the starting order rotated, so the estimator is a
+within-round ratio and the spread across rounds is the error bar. It re-ran the
+question that started this section — see "Is the lead still there?" below.
+
 The third pass exists because of a harness bug worth recording: the first version
 drove N handles from one process with `curl_multi` and reported concurrency 2 as
 *exactly* 2x the latency of concurrency 1, on three unrelated servers. That is the
@@ -295,6 +302,62 @@ blocking loop `latency.php` uses, and agrees with it to 0.1% at concurrency 1.
 numbers agreeing to 10% is not evidence that either is right. It took attributing
 CPU, rather than measuring wall time more carefully, to find a 3x cost difference
 hidden inside a 10% throughput difference.
+
+## Is the lead still there? — yes, and it is one function
+
+This was asked because five committed sweeps compared against each other say the
+answer might be no: the lead read 1.20x in one sweep and 1.09x in the next one, which
+ran **identical warm code**, and the sweep after that read ~3% below its predecessor in
+every cell. Comparing sweeps cannot settle it — in the sweep that looked like a
+regression, *every* arm fell, including RoadRunner and nginx + php-fpm, which none of
+the intervening commits touch. That is the host, not stokehold.
+
+So four variants were measured **inside the same round**, with the starting order
+rotated by round, on an idle host: the current build; the current build with the
+per-frame checksum switched off; the current build with **only** `crc32c` reverted to
+the hand-written bit-by-bit loop it replaced; and RoadRunner as a control that shares
+no code with any of them. Seven rounds × 2 endpoints × 3 concurrencies = **168
+measured cells, none failed**.
+
+| ratio, median over 7 rounds | `/` c=8 | `/` c=16 | `/` c=32 | `/items` c=8 | `/items` c=16 | `/items` c=32 |
+|---|---|---|---|---|---|---|
+| **`crc32c` fix** (current / reverted) | **+11.8%** | **+11.4%** | **+16.3%** | **+10.2%** | **+12.1%** | **+13.7%** |
+| checksum switched off | +2.0% | +2.9% | +2.5% | +3.0% | +2.7% | +2.8% |
+| current build vs RoadRunner | +18.0% | +4.6% | +4.2% | +3.3% | **−1.7%** | +7.0% |
+| **reverted build vs RoadRunner** | **+5.3%** | **−6.5%** | **−9.1%** | **−5.8%** | **−12.9%** | **−6.2%** |
+
+The first row is positive in **all 42 paired cells**; the last row is negative in all six
+cells of every round. So the effect is not merely still there — **it is the whole lead**.
+Without the fix the build is behind RoadRunner everywhere, by 5.8–12.9%. With it, it is
+ahead almost everywhere.
+
+The revert is targeted rather than an old checkout, and that is what makes the number mean
+something: building the commit *before* the fix would have bundled the FastCGI parser
+de-allocation and the single-pass response parser along with it, isolating nothing. Only
+`header::crc32c` was restored, both binaries return **byte-identical** bodies for both
+endpoints, and the test that pins the checksum to its standard check value still passes on
+the reverted tree.
+
+**Which side pays is the part worth naming**, because it is where the earlier estimate went
+wrong. `crc32c` is hashed **twice** per response: once by the PHP worker writing the frame,
+once by the server reading it. Measured per request on `/items`:
+
+| build | c | server µs | PHP µs | total µs |
+|---|---|---|---|---|
+| reverted (bit-by-bit) | 32 | **184** | 287 | 471 |
+| current (hardware CRC32) | 32 | **125** | 283 | 408 |
+| current, checksum off | 32 | **121** | 281 | 402 |
+
+The fix removes **59 µs of server CPU per request (−32%)** and leaves the PHP column alone,
+because the worker's hash was already hardware-accelerated. The earlier estimate that called
+the checksum knob "0.26%" timed only the Rust-side encoding and therefore priced half of it;
+measured end to end the knob is worth ~6 µs per request (~1.5%). Its throughput median is
+positive but its seven-round spread crosses 1.00 in four of six cells, so read it as a small,
+real, now-measured saving — and note the reason it stays on: the checksum's value is integrity,
+and 3% is not a reason to turn off a corruption check.
+
+Raw rows are committed — `results/ab-perf.tsv` and `results/cpu-per-request.tsv` — and both
+passes reproduce with `scripts/ab-perf.sh` and `scripts/diag-checksum.sh`.
 
 ## What the harness refuses to do
 

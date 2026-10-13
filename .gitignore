@@ -30,6 +30,17 @@ results/*.tsv
 # A superseded sweep is kept, not deleted: the report quotes ratios that only a
 # later build can be compared against, and a comparison needs both sides.
 !results/raw-*.tsv
+# The two interleaved A/B passes are named deliverables for the same reason the
+# crossover and latency rows are: they answer questions the sweep cannot ask.
+# `ab-perf.tsv` is the warm arm's throughput, measured in rotating order inside each
+# round so that host drift charges every variant equally; `cpu-per-request.tsv` is the
+# same three builds attributed per process, which is the measurement that localises a
+# cost rather than merely detecting one. A superseded run of either is kept beside the
+# current one the way a superseded sweep is.
+!results/ab-perf.tsv
+!results/ab-perf-*.tsv
+!results/cpu-per-request.tsv
+!results/cpu-per-request-*.tsv
 results/*.log
 !results/run.log
 *.log

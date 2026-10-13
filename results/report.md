@@ -3,10 +3,12 @@
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
 RoadRunner 2025.1.15, stokehold `91cc7b6`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
-in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three extra passes:
+in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus four extra passes:
 `scripts/latency.php` (the sequential per-request methodology the published figures used),
-`scripts/crossover.php` (the same latency at concurrency 1..16), and `scripts/diag-split.sh`
-(CPU per request, attributed across the arm's process tree).
+`scripts/crossover.php` (the same latency at concurrency 1..16),
+`scripts/diag-split.sh` and `scripts/diag-checksum.sh` (CPU per request, attributed across the
+arm's process tree), and `scripts/ab-perf.sh` (four builds measured in rotating order inside one
+round, which the blocked sweep above cannot do).
 
 > **This revision (stokehold `91cc7b6`) re-measures all five arms on the current `main`.**
 > The previous tables were taken at `ddaada7`, whose four code commits were the FastCGI
@@ -56,6 +58,20 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 > this run were 3,083 / 3,308 / 3,268, a 7% spread, and at c=1 the `wrk` client shares the
 > host with the server it is measuring. Every other P/F cell on `/` is between 1.87× and
 > 2.00×, both here and at `ddaada7`.
+>
+> **This revision also settles a question the sweeps above could not: is the crc32c fix still
+> worth what it claimed?** It is worth more than the report previously implied, and it is the
+> *only* thing that puts the warm arm ahead of RoadRunner. Measured by an interleaved A/B —
+> four variants, every one measured inside the same round, the starting order rotated, 7
+> rounds × 6 cells = 168 measured cells and 0 failures — the current build is **+10.2% to
+> +16.3%** over the same build with **only** `crc32c` reverted to the hand-written loop it
+> replaced, in **all 42 paired cells**; and that reverted build is **−5.8% to −12.9% behind
+> RoadRunner in every cell of every round**. CPU attribution agrees to the microsecond: the
+> fix removes **59 µs of server CPU per request** (184 → 125 µs on `/items` at c=32, −32%) and
+> leaves the PHP column where it was. See "Is the warm arm's lead still there?" below, and
+> hazards 50–51 in the stokehold plan. The two CPU-attribution tables *below* are still the
+> carried-over ones, but this revision adds a current attribution for exactly the three builds
+> the question is about.
 
 > **The previous revision (stokehold `841c963`) refreshed the five measured tables after the
 > transport-buffering pass** — every read and write path in stokehold's three transports now
@@ -81,6 +97,14 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 > and it was. CPU attribution found it in an hour, where wall clock had not found it in
 > three passes; see "Where the warm arm's 10% went". Every number in this report below is
 > from the fixed build.
+>
+> **A fifth pass, because the sweeps kept disagreeing with each other.** A blocked sweep
+> measures one arm at a time, so a host that drifts over twenty minutes charges that drift to
+> whichever arm ran last — which is how a 22% "effect" once appeared and then reversed sign
+> when the same two binaries were interleaved instead (hazard 49). `ab-perf.sh` measures every
+> variant inside the same round and rotates the starting order, so the estimator is a
+> within-round ratio and the spread across rounds is the error bar. That is the pass that
+> answers "is the lead still there", and it found that the lead is the `crc32c` fix, whole.
 
 ## The two endpoints are different experiments
 
@@ -103,6 +127,8 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 | Does stokehold agree with RoadRunner? | **it leads by 1-5% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
 | What was the syscall-buffering pass worth? | **2-6% on `/`, nothing on `/items`** - a fixed cost removed, not a proportional one | A/B, two binaries |
 | Did the `worker_pool.rs` split cost anything? | **no - −0.00% median**, every cell inside the repeat spread | A/B, `A,B,B,A`, two binaries |
+| Is the crc32c fix still worth what it claimed? | **it is worth more, and it is the whole lead** - +10.2% to +16.3% over the reverted build, which is 5.8-12.9% *behind* RoadRunner | interleaved A/B, 168 cells |
+| What does it cost, per process? | **59 µs of server CPU per request** (184 → 125 µs), PHP column unchanged | CPU attribution, 3 builds |
 
 Everything below is the detail behind that table.
 
@@ -392,6 +418,111 @@ twelve-record request is what this front-end tolerates, not what it receives.
 
 **A syscall cut is a fixed cost removed, not a proportional one.** It pays where the request
 is otherwise cheap, which is exactly the `GET /` arm a deployment comparison leads with.
+
+## Is the warm arm's lead still there?
+
+That question was asked because the answer looked like no. Five committed sweeps compared against
+each other show the lead at `ace1449` reading 1.20× and the next sweep, on **identical warm code**,
+reading 1.09× — and the sweep after that ~3% below it in every cell. A trend cannot answer a
+question at that size, because the thing being compared is not the only thing that moved: in the
+sweep that looked like a regression, **every** arm fell, including RoadRunner and nginx + php-fpm,
+which none of the intervening commits touch.
+
+So this is a different instrument. Four variants, each measured **inside the same round**, with
+the starting order rotated by round so a drift of any shape charges every variant equally:
+
+| variant | what it is |
+|---|---|
+| `new-req` | current build, `checksum = "required"` — what every table above used |
+| `new-opt` | current build, `checksum = "optional"` — the knob hazard 41 added |
+| `old-req` | current build with **only** `crc32c` reverted to the hand-written loop |
+| `rr` | RoadRunner — shares no code with any of the other three |
+
+`rr` is the control and the reason the result is legible. 7 rounds × 2 endpoints × 3 concurrency
+levels = **168 measured cells, 0 failed**, and the leak guard reports clean after every variant.
+The estimator is a ratio computed within a round, so the spread across the seven rounds is the
+error bar — the thing a blocked layout throws away. Raw rows: `results/ab-perf.tsv`, in
+`results/cpu-per-request.tsv` for the attribution, reproducible with `scripts/ab-perf.sh` and
+`scripts/diag-checksum.sh`.
+
+### The `crc32c` fix is worth 10–16%, and it is the whole lead
+
+The revert is **targeted**, and that is what makes the number mean something. Building the commit
+before the fix would have been simpler and would have isolated nothing: it is twenty commits back
+and bundles the FastCGI parser de-allocation (5.2%), the single-pass `parse_response` (5.2%) and
+the request-path copies along with the checksum. So only `header::crc32c` was restored to the
+bit-by-bit loop it replaced — in a second checkout, with the two binaries confirmed to differ in
+behaviour not at all, because both return **byte-identical** bodies for both endpoints and the
+pinned `crc32c_matches_the_standard_check_value` test still passes on the reverted tree.
+
+| ratio, median over 7 rounds | `/` c=8 | `/` c=16 | `/` c=32 | `/items` c=8 | `/items` c=16 | `/items` c=32 |
+|---|---|---|---|---|---|---|
+| **`crc32c` fix** (`new-req`/`old-req`) | **+11.8%** | **+11.4%** | **+16.3%** | **+10.2%** | **+12.1%** | **+13.7%** |
+| checksum option (`new-opt`/`new-req`) | +2.0% | +2.9% | +2.5% | +3.0% | +2.7% | +2.8% |
+| lead over `rr` (`new-req`/`rr`) | +18.0% | +4.6% | +4.2% | +3.3% | **−1.7%** | +7.0% |
+| **pre-fix vs `rr`** (`old-req`/`rr`) | **+5.3%** | **−6.5%** | **−9.1%** | **−5.8%** | **−12.9%** | **−6.2%** |
+
+The first row is positive in **all 42 paired cells** — the spread never crosses 1.00 anywhere.
+The last row is negative in all six cells of every round. That is the answer, and it is stronger
+than "the effect is still there": **the pre-fix build is behind RoadRunner everywhere**, by
+5.8–12.9%, so the `crc32c` fix is not one optimization among several that happen to sum to a lead.
+It is the thing that turns a consistent deficit into a consistent lead, and nothing since has
+either extended it or spent it.
+
+Per-round spreads, so the claim can be checked rather than believed:
+
+| ratio | `/` c=32 | `/items` c=32 |
+|---|---|---|
+| `crc32c` fix | 1.163× `[1.131..1.172]` | 1.137× `[1.115..1.154]` |
+| checksum option | 1.025× `[1.000..1.049]` | 1.028× `[0.995..1.055]` |
+
+The difference between those two rows is the whole methodological point: the fix's spread is far
+from 1.00, the option's is not. **A median that is positive while its own spread straddles 1.00
+is a real cost reported through a noise floor larger than it is.**
+
+### The mechanism agrees, in the column it predicted
+
+A ratio says a cost exists; CPU attribution says whose it is. Per request on `/items`, median of
+three rounds at each concurrency:
+
+| build | c | server µs | PHP µs | total µs | rps |
+|---|---|---|---|---|---|
+| `old-req` — bit-by-bit loop | 32 | **184** | 287 | 471 | 16,957 |
+| `new-req` — crate, hardware CRC32 | 32 | **125** | 283 | 408 | 19,428 |
+| `new-opt` — crate, checksum off | 32 | **121** | **281** | 402 | 19,414 |
+| `old-req` | 16 | 181 | 289 | 470 | 15,627 |
+| `new-req` | 16 | 122 | 284 | 406 | 17,581 |
+| `new-opt` | 16 | 119 | 282 | 401 | 17,708 |
+
+The fix removes **59 µs of server CPU per request (184 → 125, −32%)** and leaves the PHP column
+where it was (287 → 283). That is exactly what it should do and no more: the server hashes every
+response once, while the worker's hash is the SDK's `hash('crc32c', …)`, which was already
+hardware-accelerated. The same column moves 181 → 122 at c=16. So the 10–16% in throughput is a
+~13% cut in total CPU per request, arrived at by two instruments that share nothing but the host.
+
+Two things this does **not** say, both visible above. The warm arm at 19,400 rps uses **7.8 of 12
+cores**, so it is not CPU-saturated at this load — which is why the throughput gain is a little
+smaller than the CPU gain, and why it is not uniform across concurrency. And the PHP column is not
+*identical* across the three builds; it moves by ~6 µs in the same direction as the server column
+because the worker's hash is part of what the option removes, and the residue is run noise.
+
+### A correction: hazard 41 measured the checksum against half its own cost
+
+Hazard 41 concluded the optional checksum was "worth about 0.26%", from a microbenchmark that
+encoded a whole response with the SDK 50,000 times and compared checked against unchecked. That
+number is not wrong, it is **incomplete in a systematic way**: it timed the *Rust-side frame
+encoding*, and `crc32c` is computed **twice** per response — once by the PHP worker that writes the
+`BODY` frame, and once by the server that reads it back. The worker's copy is the larger half.
+
+Measured end to end the cost is **~6 µs of CPU per request, about 1.5%** (server 125 → 121, PHP
+283 → 281), and the throughput medians are **+2.0% to +3.0%**. So the knob is worth several times
+what hazard 41 claimed — but with the caveat above: its spread crosses 1.00 in four of the six
+cells, so it should be read as a small, real, now-measured saving rather than as a headline. The
+attribution is what makes it trustworthy; the throughput medians alone would not.
+
+For this report's purposes the recommendation does not change, and it is worth stating why: the
+checksum's value is integrity, and 3% is not a reason to turn off a corruption check. What changes
+is that the trade is now priced correctly instead of being dismissed as 0.26%.
 
 ## The crossover — latency under concurrency
 
