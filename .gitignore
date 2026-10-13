@@ -49,6 +49,10 @@ results/*.tsv
 # control — which is the only layout that can settle the fair queue's throughput gain.
 !results/slot-waits.tsv
 !results/slot-waits-*.tsv
+# The FrankenPHP arm's rows are a deliverable like the rest: they are the only measurement
+# in this repository of a server that embeds PHP rather than spawning it, and the per-round
+# spreads quoted in results/frankenphp.md are computed from them rather than re-measured.
+!results/franken-ab.tsv
 results/*.log
 !results/run.log
 *.log
@@ -56,6 +60,7 @@ results/*.log
 # output, kept beside the rows it produced. It holds the per-cell pool lines and both reports,
 # so the TSVs beside it are not a number without a provenance.
 !results/slot-waits-fair-ab-run.log
+!results/franken-ab-run.log
 
 # Editor / OS
 .idea/

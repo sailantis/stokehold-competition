@@ -1,6 +1,6 @@
 # stokehold-competition
 
-Five ways to serve **one page on one machine**, measured identically.
+Six ways to serve **one page on one machine**, measured identically.
 
 This exists to answer a question the earlier benchmarks could not. On a handler
 that returns a few dozen bytes, every deployment model lands within ~10% of every
@@ -18,7 +18,7 @@ the open decisions — is [`stokehold/docs/plan.md`](https://github.com/sailanti
 Where this README says "hazard 46" it means entry 46 there, and its section 10
 ("Where the work stands") is the current state of the build.
 
-## The five arms
+## The six arms
 
 | arm | server | model | transport |
 |---|---|---|---|
@@ -27,8 +27,9 @@ Where this README says "hazard 46" it means entry 46 there, and its section 10
 | **U** | stokehold `spawn_cgi` | cold — framework booted per request | unix socket |
 | **R** | RoadRunner `worker` | warm — framework booted once | pipe |
 | **F** | nginx + php-fpm | cold — framework booted per request | unix socket |
+| **Z** | FrankenPHP | warm — framework booted once, **PHP embedded** | in-process |
 
-Five arms is not five questions. Each pair isolates one variable:
+Six arms is not six questions. Each pair isolates one variable:
 
 - **T vs U** — the transport. Same server, same model, same SAPI, same page. A
   difference here is the transport and nothing else.
@@ -36,7 +37,13 @@ Five arms is not five questions. Each pair isolates one variable:
   boot costs when it is paid per request instead of once.
 - **F vs T/U** — the server implementation at the same cold model.
 - **P vs R** — the server implementation at the same warm model.
-
+- **Z vs P/R** — embedding against spawning. Z is the only server here that runs PHP
+  inside its own process; the other five all start an external interpreter. This is
+  the alternative stokehold rejects on principle, so Z is the number that principle
+  was traded against. It is measured in the warm-vs-warm pass only, and its result is
+  in [results/frankenphp.md](results/frankenphp.md): **a tie for fastest at
+  concurrency 1, the slowest of the three from 8 upward, and not CPU-bound while it
+  happens — it leaves 7.17 of 12 cores idle at concurrency 16.**
 **One confound is stated rather than hidden:** P is both warm *and* piped, so
 P-vs-T/U mixes the model with the transport. That mixed comparison is still the
 one that matters commercially — it is the two deployment models as they are
@@ -243,6 +250,11 @@ passwordless `sudo` (it writes one pool file and one vhost, both named
 `bench-stokehold`, and removes them afterwards). Missing pieces skip their arms
 with a reason rather than failing the run.
 
+The FrankenPHP arm is not part of `bench.sh`; it runs in the interleaved warm-arm pass
+(`scripts/ab-perf.sh`) and needs only the release binary at `~/bin/frankenphp` (`FP`
+overrides the path). It is self-contained — there is nothing to build and no Go
+toolchain required. See [results/frankenphp.md](results/frankenphp.md).
+
 Useful knobs:
 
 ```bash
@@ -266,6 +278,7 @@ project made for several weeks:
 | `diag-split.sh` / `diag-checksum.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
 | `diag-slots.sh` | 32, with the thread count varied | is the tail the pool's queueing or the load generator's |
 | `diag-slots.sh` (A/B mode) | 24 and 32, every variant inside one round | did the pool fix really buy what a blocked run said |
+| `ab-perf.sh` | 1..32, every arm inside one round, order rotated | what does each warm server do as the load rises — and where is the ceiling |
 
 They disagree, and the first two are both right. A 12-slot sweep overlaps every
 request's framework boot with eleven other requests, so the boot vanishes from the
@@ -560,10 +573,13 @@ BenchApp.php            the application: bootstrap once, dispatch, cleanup
 public/index.php        the COLD entry point (F, T, U)
 worker.php              the WARM entry point (P)
 roadrunner-worker.php   the WARM entry point (R)
+frankenphp-worker.php   the WARM entry point (Z), PHP embedded in the server
 seed.php                creates data/bench.sqlite
 apps/azera/             the application, copied from azera-competition
 conf/                   one stamped config per arm
 scripts/bench.sh        the harness
+scripts/ab-perf.sh      interleaved warm-arm pass: every arm inside one round
+scripts/ab-report.py    reads it: within-round ratios, spread across rounds
 scripts/diag-split.sh   CPU per request: server process vs PHP workers
 scripts/diag-profile.sh perf record on the server process, flat symbol report
 scripts/diag-slots.sh   the pool's own slot-wait histogram vs the client's p99

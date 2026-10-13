@@ -1,0 +1,85 @@
+variant	conc	round	endpoint	label	rps	p50	p99
+franken	1	1	/items	frankenphp worker (embedded php)	2463.90	389.00us	631.00us
+franken	8	1	/items	frankenphp worker (embedded php)	14261.78	517.00us	1.34ms
+franken	16	1	/items	frankenphp worker (embedded php)	15025.94	0.97ms	2.72ms
+franken	32	1	/items	frankenphp worker (embedded php)	15637.35	1.93ms	4.24ms
+rr	1	1	/items	roadrunner worker	1758.88	555.00us	795.00us
+rr	8	1	/items	roadrunner worker	11220.42	652.00us	1.55ms
+rr	16	1	/items	roadrunner worker	17050.91	0.85ms	2.21ms
+rr	32	1	/items	roadrunner worker	18164.36	1.69ms	3.29ms
+new-req	1	1	/items	stokehold worker (checksum required)	2402.67	404.00us	629.00us
+new-req	8	1	/items	stokehold worker (checksum required)	15521.53	482.00us	0.97ms
+new-req	16	1	/items	stokehold worker (checksum required)	19984.26	750.00us	1.56ms
+new-req	32	1	/items	stokehold worker (checksum required)	23176.79	1.28ms	3.49ms
+rr	1	2	/items	roadrunner worker	1775.87	550.00us	801.00us
+rr	8	2	/items	roadrunner worker	11035.28	656.00us	1.56ms
+rr	16	2	/items	roadrunner worker	17126.70	0.85ms	2.14ms
+rr	32	2	/items	roadrunner worker	17780.65	1.70ms	3.34ms
+new-req	1	2	/items	stokehold worker (checksum required)	2381.81	407.00us	643.00us
+new-req	8	2	/items	stokehold worker (checksum required)	15482.92	488.00us	0.95ms
+new-req	16	2	/items	stokehold worker (checksum required)	19945.66	750.00us	1.57ms
+new-req	32	2	/items	stokehold worker (checksum required)	23678.06	1.28ms	3.43ms
+franken	1	2	/items	frankenphp worker (embedded php)	2453.51	392.00us	618.00us
+franken	8	2	/items	frankenphp worker (embedded php)	14372.60	512.00us	1.34ms
+franken	16	2	/items	frankenphp worker (embedded php)	15140.07	0.96ms	2.79ms
+franken	32	2	/items	frankenphp worker (embedded php)	16021.63	1.89ms	4.19ms
+new-req	1	3	/items	stokehold worker (checksum required)	2317.06	417.00us	645.00us
+new-req	8	3	/items	stokehold worker (checksum required)	15722.89	479.00us	0.95ms
+new-req	16	3	/items	stokehold worker (checksum required)	19895.10	755.00us	1.57ms
+new-req	32	3	/items	stokehold worker (checksum required)	23736.09	1.28ms	3.46ms
+franken	1	3	/items	frankenphp worker (embedded php)	2441.45	393.00us	631.00us
+franken	8	3	/items	frankenphp worker (embedded php)	14395.61	511.00us	1.30ms
+franken	16	3	/items	frankenphp worker (embedded php)	15433.22	0.95ms	2.74ms
+franken	32	3	/items	frankenphp worker (embedded php)	15966.44	1.88ms	4.24ms
+rr	1	3	/items	roadrunner worker	1768.44	552.00us	785.00us
+rr	8	3	/items	roadrunner worker	11163.05	648.00us	1.55ms
+rr	16	3	/items	roadrunner worker	17622.84	833.00us	2.15ms
+rr	32	3	/items	roadrunner worker	18072.36	1.69ms	3.34ms
+franken	1	4	/items	frankenphp worker (embedded php)	2419.04	396.00us	654.00us
+franken	8	4	/items	frankenphp worker (embedded php)	14314.54	514.00us	1.31ms
+franken	16	4	/items	frankenphp worker (embedded php)	15313.52	0.96ms	2.69ms
+franken	32	4	/items	frankenphp worker (embedded php)	16032.95	1.88ms	4.25ms
+rr	1	4	/items	roadrunner worker	1780.32	549.00us	794.00us
+rr	8	4	/items	roadrunner worker	11256.47	645.00us	1.57ms
+rr	16	4	/items	roadrunner worker	17468.70	833.00us	2.14ms
+rr	32	4	/items	roadrunner worker	17903.29	1.68ms	3.35ms
+new-req	1	4	/items	stokehold worker (checksum required)	2495.69	387.00us	614.00us
+new-req	8	4	/items	stokehold worker (checksum required)	15537.54	483.00us	0.97ms
+new-req	16	4	/items	stokehold worker (checksum required)	20041.72	748.00us	1.58ms
+new-req	32	4	/items	stokehold worker (checksum required)	23460.25	1.27ms	3.52ms
+rr	1	5	/items	roadrunner worker	1753.38	557.00us	797.00us
+rr	8	5	/items	roadrunner worker	11000.69	657.00us	1.57ms
+rr	16	5	/items	roadrunner worker	17554.37	831.00us	2.11ms
+rr	32	5	/items	roadrunner worker	18311.57	1.68ms	3.22ms
+new-req	1	5	/items	stokehold worker (checksum required)	2388.32	406.00us	632.00us
+new-req	8	5	/items	stokehold worker (checksum required)	15261.95	494.00us	0.97ms
+new-req	16	5	/items	stokehold worker (checksum required)	20125.50	744.00us	1.56ms
+new-req	32	5	/items	stokehold worker (checksum required)	23086.92	1.31ms	3.68ms
+franken	1	5	/items	frankenphp worker (embedded php)	2399.08	402.00us	635.00us
+franken	8	5	/items	frankenphp worker (embedded php)	14098.90	520.00us	1.36ms
+franken	16	5	/items	frankenphp worker (embedded php)	15078.47	0.96ms	2.76ms
+franken	32	5	/items	frankenphp worker (embedded php)	15636.28	1.90ms	4.23ms
+new-req	1	6	/items	stokehold worker (checksum required)	2382.71	405.00us	627.00us
+new-req	8	6	/items	stokehold worker (checksum required)	15570.03	482.00us	0.95ms
+new-req	16	6	/items	stokehold worker (checksum required)	19870.95	755.00us	1.58ms
+new-req	32	6	/items	stokehold worker (checksum required)	23249.78	1.29ms	3.49ms
+franken	1	6	/items	frankenphp worker (embedded php)	2426.08	396.00us	629.00us
+franken	8	6	/items	frankenphp worker (embedded php)	14336.66	510.00us	1.31ms
+franken	16	6	/items	frankenphp worker (embedded php)	15322.88	0.95ms	2.81ms
+franken	32	6	/items	frankenphp worker (embedded php)	15787.75	1.89ms	4.22ms
+rr	1	6	/items	roadrunner worker	1796.87	542.00us	786.00us
+rr	8	6	/items	roadrunner worker	11130.59	649.00us	1.52ms
+rr	16	6	/items	roadrunner worker	17897.87	821.00us	2.08ms
+rr	32	6	/items	roadrunner worker	18210.21	1.68ms	3.24ms
+franken	1	7	/items	frankenphp worker (embedded php)	2457.83	392.00us	614.00us
+franken	8	7	/items	frankenphp worker (embedded php)	14378.33	513.00us	1.31ms
+franken	16	7	/items	frankenphp worker (embedded php)	15001.78	0.97ms	2.75ms
+franken	32	7	/items	frankenphp worker (embedded php)	15823.49	1.88ms	4.21ms
+rr	1	7	/items	roadrunner worker	1773.05	550.00us	820.00us
+rr	8	7	/items	roadrunner worker	10989.38	655.00us	1.58ms
+rr	16	7	/items	roadrunner worker	17605.34	830.00us	2.10ms
+rr	32	7	/items	roadrunner worker	18327.87	1.67ms	3.32ms
+new-req	1	7	/items	stokehold worker (checksum required)	2462.22	393.00us	619.00us
+new-req	8	7	/items	stokehold worker (checksum required)	15847.04	476.00us	0.93ms
+new-req	16	7	/items	stokehold worker (checksum required)	20083.14	745.00us	1.54ms
+new-req	32	7	/items	stokehold worker (checksum required)	23241.58	1.29ms	3.57ms

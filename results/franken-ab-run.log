@@ -1,0 +1,228 @@
+==============================================================
+ interleaved A/B: is the warm arm's lead still there?
+==============================================================
+  host:        12 cores, 3884 MB
+  php:         PHP 8.3.35 (cli) (built: Sep 25 2026 05:16:50) (NTS)
+  stokehold:   stokehold 0.1.0
+  new  binary: 7386ecf7b624a7ed1d321e1ba0c9d8b7
+  variants:    franken,rr,new-req
+  rotation:    round r starts at variant r mod 3
+  endpoints:   /items
+  concurrency: 1,8,16,32   duration: 5s   rounds: 7   workers: 12
+
+  franken -> /home/competition/stoke-bench-run-ab/franken.caddyfile  port 19900
+  rr -> /home/competition/stoke-bench-run-ab/rr.yaml  port 19901
+  new-req -> /home/competition/stoke-bench-run-ab/new-req.toml  port 19902
+
+  frankenphp:  FrankenPHP v1.13.0 PHP 8.5.11 Caddy v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=
+
+--------------------------------------------------------------
+ROUND 1 of 7
+--------------------------------------------------------------
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r1  /items  conc   1     2463.90 rps  p50 389.00us  p99 631.00us
+    r1  /items  conc   8    14261.78 rps  p50 517.00us  p99   1.34ms
+    r1  /items  conc  16    15025.94 rps  p50   0.97ms  p99   2.72ms
+    r1  /items  conc  32    15637.35 rps  p50   1.93ms  p99   4.24ms
+  leak check [franken]: clean
+  [rr] starting on port 19901
+    r1  /items  conc   1     1758.88 rps  p50 555.00us  p99 795.00us
+    r1  /items  conc   8    11220.42 rps  p50 652.00us  p99   1.55ms
+    r1  /items  conc  16    17050.91 rps  p50   0.85ms  p99   2.21ms
+    r1  /items  conc  32    18164.36 rps  p50   1.69ms  p99   3.29ms
+  leak check [rr]: clean
+  [new-req] starting on port 19902
+    r1  /items  conc   1     2402.67 rps  p50 404.00us  p99 629.00us
+    r1  /items  conc   8    15521.53 rps  p50 482.00us  p99   0.97ms
+    r1  /items  conc  16    19984.26 rps  p50 750.00us  p99   1.56ms
+    r1  /items  conc  32    23176.79 rps  p50   1.28ms  p99   3.49ms
+  leak check [new-req]: clean
+
+--------------------------------------------------------------
+ROUND 2 of 7
+--------------------------------------------------------------
+  [rr] starting on port 19901
+    r2  /items  conc   1     1775.87 rps  p50 550.00us  p99 801.00us
+    r2  /items  conc   8    11035.28 rps  p50 656.00us  p99   1.56ms
+    r2  /items  conc  16    17126.70 rps  p50   0.85ms  p99   2.14ms
+    r2  /items  conc  32    17780.65 rps  p50   1.70ms  p99   3.34ms
+  leak check [rr]: clean
+  [new-req] starting on port 19902
+    r2  /items  conc   1     2381.81 rps  p50 407.00us  p99 643.00us
+    r2  /items  conc   8    15482.92 rps  p50 488.00us  p99   0.95ms
+    r2  /items  conc  16    19945.66 rps  p50 750.00us  p99   1.57ms
+    r2  /items  conc  32    23678.06 rps  p50   1.28ms  p99   3.43ms
+  leak check [new-req]: clean
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r2  /items  conc   1     2453.51 rps  p50 392.00us  p99 618.00us
+    r2  /items  conc   8    14372.60 rps  p50 512.00us  p99   1.34ms
+    r2  /items  conc  16    15140.07 rps  p50   0.96ms  p99   2.79ms
+    r2  /items  conc  32    16021.63 rps  p50   1.89ms  p99   4.19ms
+  leak check [franken]: clean
+
+--------------------------------------------------------------
+ROUND 3 of 7
+--------------------------------------------------------------
+  [new-req] starting on port 19902
+    r3  /items  conc   1     2317.06 rps  p50 417.00us  p99 645.00us
+    r3  /items  conc   8    15722.89 rps  p50 479.00us  p99   0.95ms
+    r3  /items  conc  16    19895.10 rps  p50 755.00us  p99   1.57ms
+    r3  /items  conc  32    23736.09 rps  p50   1.28ms  p99   3.46ms
+  leak check [new-req]: clean
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r3  /items  conc   1     2441.45 rps  p50 393.00us  p99 631.00us
+    r3  /items  conc   8    14395.61 rps  p50 511.00us  p99   1.30ms
+    r3  /items  conc  16    15433.22 rps  p50   0.95ms  p99   2.74ms
+    r3  /items  conc  32    15966.44 rps  p50   1.88ms  p99   4.24ms
+  leak check [franken]: clean
+  [rr] starting on port 19901
+    r3  /items  conc   1     1768.44 rps  p50 552.00us  p99 785.00us
+    r3  /items  conc   8    11163.05 rps  p50 648.00us  p99   1.55ms
+    r3  /items  conc  16    17622.84 rps  p50 833.00us  p99   2.15ms
+    r3  /items  conc  32    18072.36 rps  p50   1.69ms  p99   3.34ms
+  leak check [rr]: clean
+
+--------------------------------------------------------------
+ROUND 4 of 7
+--------------------------------------------------------------
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r4  /items  conc   1     2419.04 rps  p50 396.00us  p99 654.00us
+    r4  /items  conc   8    14314.54 rps  p50 514.00us  p99   1.31ms
+    r4  /items  conc  16    15313.52 rps  p50   0.96ms  p99   2.69ms
+    r4  /items  conc  32    16032.95 rps  p50   1.88ms  p99   4.25ms
+  leak check [franken]: clean
+  [rr] starting on port 19901
+    r4  /items  conc   1     1780.32 rps  p50 549.00us  p99 794.00us
+    r4  /items  conc   8    11256.47 rps  p50 645.00us  p99   1.57ms
+    r4  /items  conc  16    17468.70 rps  p50 833.00us  p99   2.14ms
+    r4  /items  conc  32    17903.29 rps  p50   1.68ms  p99   3.35ms
+  leak check [rr]: clean
+  [new-req] starting on port 19902
+    r4  /items  conc   1     2495.69 rps  p50 387.00us  p99 614.00us
+    r4  /items  conc   8    15537.54 rps  p50 483.00us  p99   0.97ms
+    r4  /items  conc  16    20041.72 rps  p50 748.00us  p99   1.58ms
+    r4  /items  conc  32    23460.25 rps  p50   1.27ms  p99   3.52ms
+  leak check [new-req]: clean
+
+--------------------------------------------------------------
+ROUND 5 of 7
+--------------------------------------------------------------
+  [rr] starting on port 19901
+    r5  /items  conc   1     1753.38 rps  p50 557.00us  p99 797.00us
+    r5  /items  conc   8    11000.69 rps  p50 657.00us  p99   1.57ms
+    r5  /items  conc  16    17554.37 rps  p50 831.00us  p99   2.11ms
+    r5  /items  conc  32    18311.57 rps  p50   1.68ms  p99   3.22ms
+  leak check [rr]: clean
+  [new-req] starting on port 19902
+    r5  /items  conc   1     2388.32 rps  p50 406.00us  p99 632.00us
+    r5  /items  conc   8    15261.95 rps  p50 494.00us  p99   0.97ms
+    r5  /items  conc  16    20125.50 rps  p50 744.00us  p99   1.56ms
+    r5  /items  conc  32    23086.92 rps  p50   1.31ms  p99   3.68ms
+  leak check [new-req]: clean
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r5  /items  conc   1     2399.08 rps  p50 402.00us  p99 635.00us
+    r5  /items  conc   8    14098.90 rps  p50 520.00us  p99   1.36ms
+    r5  /items  conc  16    15078.47 rps  p50   0.96ms  p99   2.76ms
+    r5  /items  conc  32    15636.28 rps  p50   1.90ms  p99   4.23ms
+  leak check [franken]: clean
+
+--------------------------------------------------------------
+ROUND 6 of 7
+--------------------------------------------------------------
+  [new-req] starting on port 19902
+    r6  /items  conc   1     2382.71 rps  p50 405.00us  p99 627.00us
+    r6  /items  conc   8    15570.03 rps  p50 482.00us  p99   0.95ms
+    r6  /items  conc  16    19870.95 rps  p50 755.00us  p99   1.58ms
+    r6  /items  conc  32    23249.78 rps  p50   1.29ms  p99   3.49ms
+  leak check [new-req]: clean
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r6  /items  conc   1     2426.08 rps  p50 396.00us  p99 629.00us
+    r6  /items  conc   8    14336.66 rps  p50 510.00us  p99   1.31ms
+    r6  /items  conc  16    15322.88 rps  p50   0.95ms  p99   2.81ms
+    r6  /items  conc  32    15787.75 rps  p50   1.89ms  p99   4.22ms
+  leak check [franken]: clean
+  [rr] starting on port 19901
+    r6  /items  conc   1     1796.87 rps  p50 542.00us  p99 786.00us
+    r6  /items  conc   8    11130.59 rps  p50 649.00us  p99   1.52ms
+    r6  /items  conc  16    17897.87 rps  p50 821.00us  p99   2.08ms
+    r6  /items  conc  32    18210.21 rps  p50   1.68ms  p99   3.24ms
+  leak check [rr]: clean
+
+--------------------------------------------------------------
+ROUND 7 of 7
+--------------------------------------------------------------
+  [franken] starting on port 19900
+  model check [franken]: resident, 1 of 12 worker thread(s) served a request
+    r7  /items  conc   1     2457.83 rps  p50 392.00us  p99 614.00us
+    r7  /items  conc   8    14378.33 rps  p50 513.00us  p99   1.31ms
+    r7  /items  conc  16    15001.78 rps  p50   0.97ms  p99   2.75ms
+    r7  /items  conc  32    15823.49 rps  p50   1.88ms  p99   4.21ms
+  leak check [franken]: clean
+  [rr] starting on port 19901
+    r7  /items  conc   1     1773.05 rps  p50 550.00us  p99 820.00us
+    r7  /items  conc   8    10989.38 rps  p50 655.00us  p99   1.58ms
+    r7  /items  conc  16    17605.34 rps  p50 830.00us  p99   2.10ms
+    r7  /items  conc  32    18327.87 rps  p50   1.67ms  p99   3.32ms
+  leak check [rr]: clean
+  [new-req] starting on port 19902
+    r7  /items  conc   1     2462.22 rps  p50 393.00us  p99 619.00us
+    r7  /items  conc   8    15847.04 rps  p50 476.00us  p99   0.93ms
+    r7  /items  conc  16    20083.14 rps  p50 745.00us  p99   1.54ms
+    r7  /items  conc  32    23241.58 rps  p50   1.29ms  p99   3.57ms
+  leak check [new-req]: clean
+
+==============================================================
+ raw rows: /home/competition/stoke-bench-run-ab/ab-rps.tsv
+ 85 lines
+==============================================================
+  measured cells: 84
+  failed cells:   0
+
+=========== analysis ===========
+file:     /home/competition/stoke-bench-run-ab/ab-rps.tsv
+variants: franken, rr, new-req
+rounds:   1, 2, 3, 4, 5, 6, 7
+
+absolute median rps
+variant   endpoint         c=1       c=8      c=16      c=32
+------------------------------------------------------------
+franken   /items         2441    14337    15140    15823
+rr        /items         1773    11131    17554    18164
+new-req   /items         2388    15538    19984    23250
+
+within-round ratios vs rr (the control arm)
+each cell: median over rounds [min..max]   ->  a spread that spans 1.00 is no evidence
+numerator endpoint                         c=1                       c=8                      c=16                      c=32
+----------------------------------------------------------------------------------------------------------------------------
+franken   /items                1.381x [1.350..1.401]            1.288x [1.271..1.308]            0.876x [0.852..0.884]            0.867x [0.854..0.901]
+
+new-req   /items                1.362x [1.310..1.402]            1.399x [1.380..1.442]            1.146x [1.110..1.172]            1.277x [1.261..1.332]
+
+the two questions, as ratios of ratios (median over rounds and cells)
+
+  /items  c=1  
+    the lead over rr     (new-req / rr)          1.362x  ( +36.2%)  [1.310..1.402]  n=7  <- every round the same way
+    frankenphp vs rr     (franken / rr)          1.381x  ( +38.1%)  [1.350..1.401]  n=7  <- every round the same way
+    frankenphp vs stoke  (franken / new-req)     1.018x  (  +1.8%)  [0.969..1.054]  n=7
+
+  /items  c=8  
+    the lead over rr     (new-req / rr)          1.399x  ( +39.9%)  [1.380..1.442]  n=7  <- every round the same way
+    frankenphp vs rr     (franken / rr)          1.288x  ( +28.8%)  [1.271..1.308]  n=7  <- every round the same way
+    frankenphp vs stoke  (franken / new-req)     0.921x  (  -7.9%)  [0.907..0.928]  n=7  <- every round the same way (down)
+
+  /items  c=16 
+    the lead over rr     (new-req / rr)          1.146x  ( +14.6%)  [1.110..1.172]  n=7  <- every round the same way
+    frankenphp vs rr     (franken / rr)          0.876x  ( -12.4%)  [0.852..0.884]  n=7  <- every round the same way (down)
+    frankenphp vs stoke  (franken / new-req)     0.759x  ( -24.1%)  [0.747..0.776]  n=7  <- every round the same way (down)
+
+  /items  c=32 
+    the lead over rr     (new-req / rr)          1.277x  ( +27.7%)  [1.261..1.332]  n=7  <- every round the same way
+    frankenphp vs rr     (franken / rr)          0.867x  ( -13.3%)  [0.854..0.901]  n=7  <- every round the same way (down)
+    frankenphp vs stoke  (franken / new-req)     0.677x  ( -32.3%)  [0.673..0.683]  n=7  <- every round the same way (down)
+

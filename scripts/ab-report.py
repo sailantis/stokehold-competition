@@ -23,6 +23,7 @@ host. That is the distinction `bench.sh`'s blocked layout cannot make.
 
     python3 scripts/ab-report.py ~/stoke-bench-run-ab/ab-rps.tsv
 
+
 Exit status is 0 either way. This prints evidence; it does not pass or fail a run.
 """
 
@@ -31,7 +32,7 @@ import collections
 import statistics
 from pathlib import Path
 
-CONC_ORDER = ["8", "16", "32"]
+CONC_ORDER = ["1", "4", "8", "16", "32"]
 
 
 def load(path):
@@ -150,12 +151,21 @@ def main():
             new_vs_old = per_round("new-req", "old-req")
             lead_vs_rr = per_round("new-req", "rr")
             old_vs_rr = per_round("old-req", "rr")
+            # The embedded runtime, against both warm servers. `franken` is not part
+            # of the stokehold story at all — it is the one arm that answers "what
+            # does embedding buy you", so it is reported as its own pair of ratios
+            # rather than folded into the checksum question above. Both denominators
+            # are controls that share no code with it.
+            franken_vs_rr = per_round("franken", "rr")
+            franken_vs_req = per_round("franken", "new-req")
             print(f"  {endpoint:<7} c={conc:<3}")
             for label, series in [
                 ("skipping the checksum (new-opt / new-req)", opt_vs_req),
                 ("the crc32c fix       (new-req / old-req)", new_vs_old),
                 ("the lead over rr     (new-req / rr)      ", lead_vs_rr),
                 ("what the fix bought  (old-req / rr)      ", old_vs_rr),
+                ("frankenphp vs rr     (franken / rr)      ", franken_vs_rr),
+                ("frankenphp vs stoke  (franken / new-req) ", franken_vs_req),
             ]:
                 if not series:
                     continue

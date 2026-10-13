@@ -1,0 +1,90 @@
+# ARM Z — FrankenPHP, running the SAME resident worker model as ARM P and R.
+#
+# This is the sixth arm, and the reason it is interesting is architectural rather
+# than incremental: FrankenPHP embeds the PHP interpreter inside its own process
+# (Caddy + a ZTS PHP built in), which is the one approach stokehold deliberately
+# rejects — no embedding, no FFI, always an external `php` process (see the plan's
+# constraints section). Every other arm here spawns PHP; this one *is* PHP. If the
+# question "what would embedding have bought us" is ever asked, this arm is the
+# number it gets answered with.
+#
+# The comparison it belongs to is P vs R vs Z: three servers, one model (boot the
+# application once, keep it warm), one application, so `num` / `workers` /
+# `num_workers` are held at 12 everywhere and only the server differs.
+#
+# ---------------------------------------------------------------------------
+# Two directives here are load-bearing and neither is the default.
+#
+# `match /*`
+#   Without it, `php_server` runs the worker only for requests whose path ends in
+#   `.php` and otherwise does the try_files dance — so `/items` is looked up as a
+#   FILE under the root, not found, and falls to the regular (non-worker) PHP
+#   handler, which re-executes `public/index.php` from scratch on every request.
+#   That is the COLD model wearing the warm arm's label: it would look like a
+#   slow FrankenPHP rather than like a misconfigured front controller, and it
+#   would return a correct 200 the whole time.
+#
+#   (`php_server` is "serve files, run PHP", which is why the default is what it
+#   is. The other arms all route *everything* through the application, so this arm
+#   has to as well or it is measuring a different question.)
+#
+# `php_ini`
+#   FrankenPHP bundles its own PHP and, on this host, the release binary loads NO
+#   php.ini whatsoever: `php_ini_loaded_file()` comes back empty and the engine
+#   runs PHP's compiled-in defaults — memory_limit 128M, opcache.validate_timestamps
+#   ON, opcache.enable_cli off. Those are precisely the settings hazard 28 is about:
+#   a difference of ini that is indistinguishable from a difference of server, worth
+#   3.1x on this very host in its xdebug form. The FPM arm pins them, the php-cgi and
+#   php-worker wrappers pin them, so this arm pins them too — and `frankenphp-worker.php`
+#   prints what each thread actually ended up with to stderr, because a value that
+#   looks right here and is not applied cannot be seen from outside.
+#
+# ---------------------------------------------------------------------------
+
+{
+	# Nothing here needs the admin endpoint, and leaving it on binds a fixed port
+	# that a previous run's process would still be holding.
+	admin off
+
+	frankenphp {
+		# Only the worker threads exist: no request should ever be served by a
+		# non-worker PHP thread on this arm, because a non-worker thread is the cold
+		# model. Kept at the minimum rather than omitted so the intent is explicit.
+		num_threads 1
+
+		# `max_requests` is 0 (unlimited) by default, and it is stated rather than
+		# left implicit because it is the setting the other three arms are matched
+		# on: stokehold `max_requests = 0`, RoadRunner `max_jobs: 0`, FPM
+		# `pm.max_requests = 0`. A non-zero value here would recycle the warm
+		# framework and quietly turn this into a cold arm partway through a run.
+		max_requests 0
+
+		php_ini memory_limit 512M
+		php_ini opcache.enable 1
+		php_ini opcache.validate_timestamps 0
+		php_ini display_errors Off
+		php_ini date.timezone UTC
+	}
+}
+
+# `http://` rather than a bare address, and not the `localhost` spelling: Caddy
+# automatically provisions TLS for hostnames, and this arm must be plain HTTP to
+# match the other five. `http://` is the documented way to switch that off.
+http://127.0.0.1:{{PORT}} {
+	# The front controller lives in public/, but so do nothing else that matters —
+	# every request is routed by the worker, so nothing is ever served from disk.
+	root {{ROOT}}/public
+
+	# No `encode`, no `file_server`, no caching: the other arms run PHP for every
+	# request including one for a file that exists, and a FrankenPHP that answered
+	# such a request itself would be measuring a different server.
+	php_server {
+		worker {
+			file {{ROOT}}/frankenphp-worker.php
+			# Matched to ARM P's `workers = 12`: one per core of the benchmark host.
+			num {{WORKERS}}
+			# See the note above — without this the worker serves nothing.
+			match /*
+		}
+	}
+}

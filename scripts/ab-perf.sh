@@ -21,11 +21,33 @@
 #   new-opt    current stokehold, checksum = "optional"   (does skipping it help?)
 #   old-req    pre-crc32c-fix stokehold, checksum = "required"  (what the fix bought)
 #   rr         RoadRunner, resident worker                 (the control)
+#   franken    FrankenPHP, worker mode                     (embedded-runtime control)
 #
 # `rr` is the control and the reason this is an A/B and not a trend: it shares no
 # code with any other variant, so a round in which every stokehold variant moved
 # but `rr` did not is a round in which stokehold moved, and a round in which both
 # moved together is the host.
+#
+# `franken` is a second control of a different kind, and it earns its place by being
+# the one arm that answers an architectural question rather than a tuning one.
+# FrankenPHP embeds the PHP interpreter inside its own process — a Caddy server with
+# a ZTS PHP built into the binary — which is exactly what stokehold rejects on
+# purpose (no embedding, no FFI, PHP is always an external process; see the plan's
+# constraints). Every other variant here spawns PHP; this one IS PHP. It runs
+# `frankenphp-worker.php`, which drives the same `BenchApp` as `worker.php` and
+# `roadrunner-worker.php` with the same worker count, so warm-vs-warm is held equal
+# and the only difference left is the runtime underneath.
+#
+# It is NOT a like-for-like PHP: the release binary bundles PHP 8.5.11 against this
+# host's 8.3.35. See the note in `conf/frankenphp.caddyfile.template` — it is stated
+# as a confound rather than corrected, because the alternative is not measuring the
+# server people actually deploy.
+#
+# Its per-arm log is also where the embedded runtime's effective ini is read back
+# from inside a worker thread, which is the only way to see hazard 28 coming: the
+# release binary loads no php.ini at all, so without the Caddyfile's `php_ini` it
+# would run the whole arm at PHP's compiled-in defaults (128M, timestamp validation
+# on) while every other arm ran 512M and off.
 #
 # The `old-req` variant is a targeted revert rather than an old checkout: the
 # crate-backed `crc32c` in `stokehold-worker/src/header.rs` is replaced with the
@@ -47,6 +69,13 @@
 #   ROOT      this checkout               (default the script's parent directory)
 #   RUNDIR    scratch + results           (default ~/stoke-bench-run-ab)
 #   RR        RoadRunner binary           (default ~/bin/rr)
+#   FP        FrankenPHP binary           (default ~/bin/frankenphp)
+#
+# The FrankenPHP arm needs no php.ini beside its binary and no wrapper script: its
+# ini is set by `php_ini` in the Caddyfile the script stamps, which acts on the
+# interpreter inside the worker threads. A `php.ini` left in the working directory
+# would do the same thing by a second route and make "which one applied" ambiguous,
+# so don't add one.
 set -uo pipefail
 
 # The locale is pinned because the rows are TAB-separated numbers that other tools read
@@ -62,7 +91,8 @@ BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
 BIN_OLD="${BIN_OLD:-$HOME/stoke-bench-nocrc/target/release/stokehold}"
 RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-ab}"
 RR="${RR:-$HOME/bin/rr}"
-VARIANTS="${VARIANTS:-new-req,new-opt,old-req,rr}"
+FP="${FP:-$HOME/bin/frankenphp}"
+VARIANTS="${VARIANTS:-new-req,new-opt,old-req,rr,franken}"
 CONC="${CONC:-8,16,32}"
 DUR="${DUR:-5s}"
 ROUNDS="${ROUNDS:-7}"
@@ -156,6 +186,14 @@ logs:
   level: warn
 EOF
             ;;
+        franken)
+            # Stamped from the arm's real template rather than inlined, so the
+            # directive that makes the difference here — `match /*`, without which
+            # `php_server` silently serves the *cold* path and the arm measures the
+            # wrong model — lives in exactly one place.
+            sed -e "s#{{ROOT}}#$ROOT#g" -e "s#{{PORT}}#$port#g" -e "s#{{WORKERS}}#$WORKERS#g" \
+                "$ROOT/conf/frankenphp.caddyfile.template" >"$RUNDIR/$variant.caddyfile"
+            ;;
         *)
             cat > "$file" <<EOF
 default_backend = "app"
@@ -177,6 +215,7 @@ EOF
 # --- start/stop -------------------------------------------------------------
 PID=""
 RR_PID=""
+FP_PID=""
 
 stop_variant() {
     [ -n "$PID" ] && kill "$PID" 2>/dev/null
@@ -190,6 +229,19 @@ stop_variant() {
     pkill -f "$RUNDIR/rr.yaml" 2>/dev/null
     [ -n "$RR_PID" ] && wait "$RR_PID" 2>/dev/null
     RR_PID=""
+    # FrankenPHP is Caddy, so it is matched the same way RoadRunner is and for the
+    # same reason: its argv is `frankenphp run --config .../franken.caddyfile`, and
+    # a pkill on the binary name is both too wide (it would match an unrelated
+    # Caddy on this host) and too fragile. The stamped config path is unique to
+    # this run. Killing it takes its worker threads with it, because they are
+    # threads of that process rather than children.
+    [ -n "$FP_PID" ] && kill "$FP_PID" 2>/dev/null
+    # Matched by a wildcard rather than by the variant name, so the EXIT trap can
+    # call this with no argument at all and still reap a FrankenPHP left behind by
+    # an interrupted run. Only this arm ever has a `.caddyfile` in RUNDIR.
+    pkill -f "$RUNDIR/.*[.]caddyfile" 2>/dev/null
+    [ -n "$FP_PID" ] && wait "$FP_PID" 2>/dev/null
+    FP_PID=""
 }
 
 # The warm arms' children are `php .../worker.php` and `php .../roadrunner-worker.php`,
@@ -198,11 +250,20 @@ stop_variant() {
 # would hold a pipe and compete for cores in the next round, which is the leak this
 # guard is for. `-ww` is load-bearing: without it the argv is truncated to the
 # terminal width and the path is lost.
+#
+# The stamped Caddyfile path is matched as well, and that one is not about children:
+# FrankenPHP's workers are THREADS of the Caddy process, so no descendant ever
+# carries the worker script's path. A FrankenPHP left running by a failed teardown
+# would be invisible to the two script paths above while still holding its port —
+# and, worse, the next round's `wait_port` would then succeed against the OLD server
+# and publish a measurement of a variant that was never started.
 worker_pids() {
-    ps -eww -o pid=,args= 2>/dev/null | awk -v root="$ROOT" '
-        $0 !~ /awk/ && index($0, root "/worker.php") + index($0, root "/roadrunner-worker.php") > 0 {
-            print $1
-        }'
+    # One line, deliberately: awk ends the pattern at a newline, so a `&& (` split
+    # across lines is a syntax error, and awk's error goes to stderr while the
+    # function still returns an empty list — which reads as "clean". That happened
+    # on the first run of this arm and made the leak guard silently blind.
+    ps -eww -o pid=,args= 2>/dev/null | awk -v root="$ROOT" -v rundir="$RUNDIR" '
+        $0 !~ /awk/ && $0 ~ (root "/worker[.]php|" root "/roadrunner-worker[.]php|" rundir "[.]caddyfile") { print $1 }'
 }
 
 count_workers() { worker_pids | wc -w | tr -d " "; }
@@ -241,6 +302,38 @@ wait_port() {
     return 1
 }
 
+# Is anything already answering on a port this run is about to use?
+#
+# This is the one failure that corrupts a whole run without leaving a mark on any
+# single cell. `wait_port` above succeeds against *whatever* is listening, so a server
+# left behind by an interrupted run makes the next round's start-up look fine while the
+# number that comes out belongs to a process this run did not start and cannot vouch
+# for. It is not hypothetical: it produced a FrankenPHP row of 4,478 rps against a true
+# 15,300 during the CPU-attribution work, and it was then caught again as a stray
+# holding port 19900 across a logged run — which is why every run now refuses to begin
+# on a port it does not own.
+#
+# The check is done once, up front, for all variants at once. Checking per-cell would
+# not help: by the time a cell runs, the wrong server has already been measured.
+port_is_free() {
+    ! curl -s -o /dev/null -m 1 "http://127.0.0.1:$1/" 2>/dev/null
+}
+
+check_ports_free() {
+    local v p busy=""
+    for v in ${VARIANTS//,/ }; do
+        p="$(port_of "$v")"
+        port_is_free "$p" || busy="$busy $v($p)"
+    done
+    if [ -n "$busy" ]; then
+        echo "FATAL: something is already answering on a port this run needs, so it"
+        echo "       would be measured in place of the variant named:$busy"
+        echo "       See what owns it:  ss -ltnp"
+        echo "       Or kill every bench server:  pkill -f stoke-bench-run-ab"
+        exit 1
+    fi
+}
+
 # Answering 200 is not enough: an arm that serves the wrong page measures the
 # wrong application, and this repository has already published a number for an
 # nginx arm that was serving the front controller's SOURCE with a happy 200.
@@ -263,6 +356,54 @@ sanity() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Is this arm serving through a resident worker at all?
+#
+# A server that answers 200 with the right page and the right bytes can still be
+# serving the wrong MODEL, and on this repository that has already published a number
+# once — which is why `bench.sh` checks the body and not just the status. The
+# FrankenPHP arm has the sharpest version of the trap, because there the
+# misconfiguration is a DEFAULT rather than a typo: `php_server` runs a `worker` only
+# where `match` says so, and its default is "requests for a .php file". Everything
+# else is handed to the ordinary per-request PHP handler, which re-executes the front
+# controller from scratch.
+#
+# Measured on this host, same binary, two Caddyfiles differing only by that one
+# directive, `GET /items` at conc 32:
+#
+#     worker matched to `/*`    15,856 rps
+#     no `match` (the default)     662 rps
+#
+# A 24x gap that no response can reveal: both return 200, both contain the page
+# marker, both serve byte-identical bodies. The check is therefore a positive one
+# rather than a smell test — the worker script writes a line the first time its
+# request loop is actually asked to serve something, and if the line is missing the
+# loop was never entered.
+#
+# A timing check was tried first and discarded, with the numbers: an unloaded request
+# takes a median 1.26 ms through the worker and 2.61 ms through the cold path on this
+# host, and the best-case cold (1.96 ms) overlaps the worst-case warm (1.35 ms). Any
+# floor between them would be a coin flip, and the host is shared with other work.
+# A thread count read out of the log was tried too and discarded for the same class of
+# reason: both configurations start all 12 worker threads and both log all 12 reaching
+# their loop. The worker is real in both cases; it is simply never asked to serve.
+# ---------------------------------------------------------------------------
+assert_worker_mode() {
+    local variant="$1" log="$RUNDIR/$1.log" n
+    case "$variant" in franken) ;; *) return 0 ;; esac
+    n="$(grep -c 'served its first request' "$log" 2>/dev/null || true)"
+    n="${n:-0}"
+    if [ "$n" -lt 1 ]; then
+        echo "  model check [franken]: FAILED - the worker loop was never entered, so"
+        echo "  this arm served the COLD path. The Caddyfile's worker needs 'match /*';"
+        echo "  without it php_server answers every request from the per-request handler"
+        echo "  with a correct 200, and the arm measures a model it does not claim."
+        return 1
+    fi
+    echo "  model check [franken]: resident, $n of $WORKERS worker thread(s) served a request"
+    return 0
+}
+
 start_variant() {
     local variant="$1" port
     port="$(port_of "$variant")"
@@ -271,6 +412,14 @@ start_variant() {
             ( cd "$ROOT" && exec "$RR" serve -c "$RUNDIR/rr.yaml" ) \
                 >"$RUNDIR/$variant.log" 2>&1 &
             RR_PID=$!
+            ;;
+        franken)
+            # `--config` and an explicit adapter, not a bare `Caddyfile` in the
+            # working directory: the config lives beside the other variants' configs
+            # and is named after this one, which is also how teardown finds it.
+            "$FP" run --config "$RUNDIR/$variant.caddyfile" --adapter caddyfile \
+                >"$RUNDIR/$variant.log" 2>&1 &
+            FP_PID=$!
             ;;
         *)
             "$(binary_of "$variant")" serve -c "$RUNDIR/$variant.toml" \
@@ -309,6 +458,7 @@ label_of() {
         new-opt) echo "stokehold worker (checksum optional)" ;;
         old-req) echo "stokehold worker (pre-crc32c-fix)" ;;
         rr) echo "roadrunner worker" ;;
+        franken) echo "frankenphp worker (embedded php)" ;;
         *) echo "$1" ;;
     esac
 }
@@ -336,9 +486,30 @@ echo
 
 for v in ${VARIANTS//,/ }; do
     write_config "$v"
-    echo "  $v -> $( [ "$v" = rr ] && echo "$RUNDIR/$v.yaml" || echo "$RUNDIR/$v.toml" )  port $(port_of "$v")"
+    case "$v" in
+        rr) echo "  $v -> $RUNDIR/$v.yaml  port $(port_of "$v")" ;;
+        franken) echo "  $v -> $RUNDIR/$v.caddyfile  port $(port_of "$v")" ;;
+        *) echo "  $v -> $RUNDIR/$v.toml  port $(port_of "$v")" ;;
+    esac
 done
 echo
+
+# The embedded runtime's identity, for the same reason the binaries' md5 sums are
+# printed: the arm is only reproducible if it is the same build. `frankenphp
+# version` reports its bundled PHP as well, which is the confound this arm carries
+# against the host's PHP — printed here rather than buried in a log per round.
+if [ -x "$FP" ]; then
+    echo "  frankenphp:  $("$FP" version 2>/dev/null | head -1)"
+else
+    for v in ${VARIANTS//,/ }; do
+        [ "$v" = franken ] && fail "variant franken needs FP at $FP"
+    done
+fi
+echo
+
+# Before the results file is truncated, so a run that refuses to start leaves the previous
+# one's rows intact rather than emptying the file it is about to fail to fill.
+check_ports_free
 
 : >"$RESULTS"
 printf 'variant\tconc\tround\tendpoint\tlabel\trps\tp50\tp99\n' >>"$RESULTS"
@@ -357,8 +528,8 @@ for round in $(seq 1 "$ROUNDS"); do
         port="$(port_of "$variant")"
         echo "  [$variant] starting on port $port"
         start_variant "$variant"
-        if ! wait_port "$port" || ! sanity "$port"; then
-            echo "  $variant NOT MEASURED this round:"; tail -5 "$RUNDIR/$variant.log" 2>/dev/null
+        if ! wait_port "$port" || ! sanity "$port" || ! assert_worker_mode "$variant"; then
+            echo "  $variant NOT MEASURED this round:"; tail -12 "$RUNDIR/$variant.log" 2>/dev/null
             stop_variant
             guard_variant "$variant"
             continue
