@@ -88,15 +88,15 @@ degraded path.
 not Windows making FastCGI good. `spawn_cgi` measured on the same host peaks at
 **~1,730 rps against the resident worker's ~9,700 on `/items`** — about 5.6× — so once
 the warm arm is not crippled by the pipe it wins on Windows by a *larger* margin than
-the Linux arms show (8,385 against 19,504, or 2.3×). Windows is slower for both
+the Linux arms show (8,179 against 18,655, or 2.3×). Windows is slower for both
 deployment models; it is the cold one that pays much more of the penalty:
 
 | metric (`GET /items`) | Linux, 12 cores, idle | Windows, 6c/12t, 20–30% busy | ratio |
 |---|---|---|---|
-| resident worker, sequential p50 | 0.556 ms | 0.82 ms | 1.5× |
+| resident worker, sequential p50 | 0.585 ms | 0.82 ms | 1.4× |
 | FastCGI, sequential p50 | 1.52 ms | 4.6 ms | **3.0×** |
-| peak throughput, resident worker | 19,504 rps | 9,717 rps | 0.50× |
-| peak throughput, FastCGI | 8,385 rps | 1,728 rps | **0.21×** |
+| peak throughput, resident worker | 18,655 rps | 9,717 rps | 0.52× |
+| peak throughput, FastCGI | 8,179 rps | 1,728 rps | **0.21×** |
 
 So the deployment-model conclusion is not platform-specific after all — the resident
 worker wins on both, and wins *more* easily on Windows. What was platform-specific was
@@ -205,10 +205,10 @@ Windows deployment and an unusable one — it is the difference between **~775 r
 ~8,800 rps**, and it does it while *leaving* 38% of the host idle for PHP, where the
 pipe arm sits blocked and consumes almost nothing.
 
-Two honest caveats. Comparing 8.6k against the Linux `wrk` figure of ~19.4k mixes load
+Two honest caveats. Comparing 8.6k against the Linux `wrk` figure of ~18.7k mixes load
 generators and hosts, so it is indicative and not evidence; the like-for-like
-comparison is the sequential one, where socket 0.82 ms against Linux 0.556 ms is the
-same order and pipe 15.26 ms against Linux 0.556 ms is not. And the raw rows are
+comparison is the sequential one, where socket 0.82 ms against Linux 0.585 ms is the
+same order and pipe 15.26 ms against Linux 0.585 ms is not. And the raw rows are
 committed as `results/raw-windows-279dc35.tsv` — the 70 rows behind this table, five
 repeats per cell and **zero errors in any of them**, in the repository's own raw
 format, so every figure above is the median of five committed rows rather than a
@@ -397,18 +397,24 @@ application boots — which is exactly the thing the earlier trivial-handler
 measurements could not see.
 
 That is also why a superseded sweep is kept rather than overwritten. `results/raw.tsv`
-is the current run, `results/raw-841c963.tsv` the one before it, and
+is the current run (`91cc7b6`), and the ones before it are kept beside it —
+`raw-ddaada7.tsv` and `raw-841c963.tsv` — so
 `scripts/compare_runs.py` prints both tables and the ratio change between them:
 
 ```bash
-python3 scripts/compare_runs.py results/raw-841c963.tsv results/raw.tsv
+python3 scripts/compare_runs.py results/raw-ddaada7.tsv results/raw.tsv
 ```
 
-Read the ratios, not the throughput. A 1.5% median change across the cells is
-consistent with noise — RoadRunner moved by 2.8% in the last re-run without a
-single line of its code changing, which is the honest indicator of how much of
-any such difference is real. A *ratio* that moves further than the spread is the
-thing worth explaining.
+Read the ratios, not the throughput. **The absolute rps column is not comparable between
+sweeps, and the last two revisions are the proof:** `ddaada7` read 1–3% below `841c963` in
+every cell, and the only code change between them was four micro-optimizations whose own
+measurements claimed no throughput at all. Re-deriving it from the two committed files
+shows what was actually there — every arm fell *except* the one the commits touched
+(P +0.35%, R −2.79%, F −1.63%, T −1.54%, U −1.77%, RoadRunner slower in 10 of 10 cells).
+The way to read that is a ratio against a control arm, which cancels whatever the host did
+underneath both, and by that reading the four commits *improved* stokehold's lead by 5.3%
+on `/`. A *ratio* that moves further than the spread is the thing worth explaining; a
+throughput delta of the same size is not.
 
 **When a ratio surprises you, measure whose CPU it is before theorising.** The
 `diag-*` scripts are here because that is how the largest single finding in this

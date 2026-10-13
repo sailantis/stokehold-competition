@@ -1,43 +1,61 @@
 # Five ways to serve one page — 12 cores, one host
 
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
-RoadRunner 2025.1.15, stokehold `ddaada7`, wrk 4.1.0.
+RoadRunner 2025.1.15, stokehold `91cc7b6`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
 in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three extra passes:
 `scripts/latency.php` (the sequential per-request methodology the published figures used),
 `scripts/crossover.php` (the same latency at concurrency 1..16), and `scripts/diag-split.sh`
 (CPU per request, attributed across the arm's process tree).
 
-> **This revision (stokehold `ddaada7`) re-measures all five arms on the current `main`.**
-> The previous tables were taken at `841c963`, which was four code commits behind — the
-> FastCGI response-assembly fix, the worker request path, the reply-frame buffer, and the
-> optional checksum. The re-run exists to confirm those changes did not disturb the report's
-> conclusions, and they did not: the median change across all 50 cells is **1.5%**, and every
-> headline ratio holds to within 5%. Per arm, the median change is **P +0.3%**, **R −2.8%**,
-> **F −1.6%**, **U −1.8%**, **T −1.5%**.
+> **This revision (stokehold `91cc7b6`) re-measures all five arms on the current `main`.**
+> The previous tables were taken at `ddaada7`, whose four code commits were the FastCGI
+> response-assembly fix, the worker request path, the reply-frame buffer, and the optional
+> checksum. Five commits have landed since — the Windows/loopback transport work and a pure
+> refactor that split `worker_pool.rs` into six files along its real seams.
 >
-> One thing the re-run does **not** claim. Three of the four commits say in their own hazards
-> that they claim no throughput at all (hazard 39, 40, 42), and the fourth — the optional
-> checksum — was measured at ~0.26% of one request (hazard 41). A 1.5% median is therefore not
-> evidence that any of them helped; it is consistent with measurement noise, and the −2.8% on
-> RoadRunner, which none of the changes touch, is the honest indicator of how much of this is
-> drift. What the re-run **does** establish is that the report is now true about which binary
-> produced it, and that none of the four changes regressed anything.
+> **The honest reading of the previous sweep was wrong, and correcting it is why this
+> revision exists.** That sweep read 1–3% slower than the one before it in every cell, and
+> the note here dismissed it as drift using a re-run of R and F that was never committed —
+> a sentence, not data. Re-deriving it from the two committed files shows the pattern the
+> note missed: every arm fell *except* the two arms the four commits touched (P +0.35%,
+> R −2.79%, F −1.63%, T −1.54%, U −1.77% — RoadRunner slower in 10 of 10 cells). The
+> absolute rps column is not comparable between sweeps; the ratios are, and by those the
+> four commits *improved* stokehold's lead (P/R +5.3% on `/`).
 >
-> The earlier `841c963` sweep is kept as `results/raw-841c963.tsv`, so the comparison can be
-> re-derived with `scripts/compare_runs.py` rather than believed. The per-arm medians above
-> come from it; note that the per-concurrency ratios in the two tables below move by up to
-> 5% either way, and the largest single ratio move (P/F at c=1 on `/`, +15%) is driven by one
-> noisy cell whose three repeats span 9.6%.
+> **And the leak guard that sweep relied on could not see the arms it guarded.** It matched
+> the literal string `php-cgi -b`, but arms T and U spawn PHP through a wrapper whose argv
+> puts its `-d` flags before `-b`, so the pattern matched **0** of the 12 children a running
+> arm had. It reported 0 while twelve were alive and still reported 0 after a `kill -9` left
+> all twelve orphaned. The "8 strays" it did report were leftovers from older configs, not
+> from the arms being measured. The guard now matches `-b` as its own word and runs after
+> **every** arm, refusing to continue if a leak cannot be cleared; this run reports
+> `leak check [P|T|U|R|F]: clean` and 0 strays at teardown.
 >
-> **One thing was checked rather than assumed.** The run's own teardown reported 8 stray
-> `php-cgi` processes, and because the arms run P, T, U, R, F, those strays existed while the
-> last two arms were being measured. They were verified harmless rather than argued harmless:
-> R and F were re-run with the strays cleared, and the two arms moved by a median of 1.0%
-> across their 20 cells — inside the spread, and in the direction *opposite* to a slowdown
-> (R read 4–5% *higher* on the clean re-run). A leaked `php-cgi` blocked on a socket consumes
-> no CPU, so it does not compete with the arm under test. The harness's stray check runs only
-> once, at the end; a mid-run version of it would have caught this the moment it happened.
+> **The refactor cannot cost throughput, and that was measured rather than argued.** P is
+> ~3.3% below the previous sweep here, above every control arm's drift, and the only code
+> change since is the file split. Two binaries — `ddaada7` and `91cc7b6` — were built and
+> alternated `A,B,B,A` on the same idle host, 5 s × 3 repeats per cell:
+>
+> | endpoint | c=1 | c=4 | c=8 | c=16 | c=32 |
+> |---|---|---|---|---|---|
+> | `/`, `91cc7b6` vs `ddaada7` | −0.52% | +0.92% | +0.68% | +0.23% | −0.42% |
+> | `/items`, same | +1.00% | +1.68% | −0.24% | −1.04% | −1.56% |
+>
+> Median **−0.00%**, 5 of 10 cells each way, every delta inside the 3.3% within-cell repeat
+> spread. So the refactor is free, and the ~3.3% on P in the table below is drift that
+> happened to land on this run rather than on stokehold.
+>
+> The per-arm medians below come from the comparison, not from this note: **P −3.3%**,
+> **R −1.5%**, **F −0.9%**, **T −0.6%**, **U −2.0%**. Read the ratios, not the deltas.
+> `results/raw-ddaada7.tsv` is kept alongside `results/raw.tsv`, so the comparison can be
+> re-derived with `scripts/compare_runs.py` rather than believed.
+>
+> One ratio move is worth naming so it is not read as an effect: **P/F at c=1 on `/` reads
+> 1.79× here against 2.11× before (−14.7%)**, and it is one noisy cell — P's three repeats in
+> this run were 3,083 / 3,308 / 3,268, a 7% spread, and at c=1 the `wrk` client shares the
+> host with the server it is measuring. Every other P/F cell on `/` is between 1.87× and
+> 2.00×, both here and at `ddaada7`.
 
 > **The previous revision (stokehold `841c963`) refreshed the five measured tables after the
 > transport-buffering pass** — every read and write path in stokehold's three transports now
@@ -77,13 +95,14 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus three ex
 | question | answer | how measured |
 |---|---|---|
 | Does the warm model pay off? | **yes, ~2.1x per request** (published: 3.3x) | sequential latency |
-| Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.29x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
+| Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.24x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
 | At what load does it stop paying? | **it does not, within 1..16** - flat ~2.0x | crossover |
 | Why does the cold model idle 16% of the cores? | **it costs 1,063 us of CPU per request against 666** - a duty cycle, not headroom | CPU accounting |
 | Is loopback TCP a problem? | **no - T and U agree to 3%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
 | Which transport should I use? | **either** - keep `unix:` for permissions, not speed | both |
-| Does stokehold agree with RoadRunner? | **it leads by 5% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
+| Does stokehold agree with RoadRunner? | **it leads by 1-5% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
 | What was the syscall-buffering pass worth? | **2-6% on `/`, nothing on `/items`** - a fixed cost removed, not a proportional one | A/B, two binaries |
+| Did the `worker_pool.rs` split cost anything? | **no - −0.00% median**, every cell inside the repeat spread | A/B, `A,B,B,A`, two binaries |
 
 Everything below is the detail behind that table.
 
@@ -91,32 +110,32 @@ Everything below is the detail behind that table.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 3,760 | 13,409 | 23,969 | 35,740 | 38,021 |
-| **R** | RoadRunner | warm worker, pipe | 3,043 | 11,166 | 19,567 | 33,940 | 36,322 |
-| **F** | nginx + php-fpm | cold, unix socket | 1,789 | 6,675 | 12,005 | 18,327 | 18,040 |
-| **U** | stokehold | cold, unix socket | 1,552 | 5,725 | 9,634 | 14,999 | 16,481 |
-| **T** | stokehold | cold, loopback TCP | 1,515 | 5,875 | 9,728 | 14,346 | 16,637 |
+| **P** | stokehold | warm worker, pipe | 3,268 | 12,969 | 23,277 | 34,393 | 36,008 |
+| **R** | RoadRunner | warm worker, pipe | 2,998 | 11,143 | 19,729 | 33,462 | 35,512 |
+| **F** | nginx + php-fpm | cold, unix socket | 1,822 | 6,503 | 11,638 | 18,365 | 17,960 |
+| **U** | stokehold | cold, unix socket | 1,570 | 5,631 | 9,419 | 14,396 | 16,125 |
+| **T** | stokehold | cold, loopback TCP | 1,533 | 5,865 | 9,736 | 14,212 | 16,743 |
 
-Ratios at c=32: **P/F 2.11×**, **R/F 2.01×**, **T/U 1.01×**.
+Ratios at c=32: **P/F 2.00×**, **R/F 1.98×**, **T/U 1.04×**.
 
-Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~3%, which
-is what makes the warm half of the comparison credible — two independent servers, one
-model — and stokehold is now the marginally faster of the two. And on this endpoint
-**transport is irrelevant**: 1.01× T/U, and T and U are themselves within 0.4% (16,637 against
-16,481). The piped worker's advantage comes from not booting the framework, not from the
-pipe.
+Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~5% at
+c=32 (36,008 against 35,512, **1.01×**), which is what makes the warm half of the
+comparison credible — two independent servers, one model — and stokehold is the marginally
+faster of the two at every concurrency up to 16. And on this endpoint **transport is
+irrelevant**: 1.04× T/U, and T and U are themselves within 4%. The piped worker's advantage
+comes from not booting the framework, not from the pipe.
 
 ## `GET /items` — throughput
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 1,794 | 7,049 | 11,693 | 17,282 | 19,352 |
-| **R** | RoadRunner | warm worker, pipe | 1,755 | 6,329 | 11,168 | 17,667 | 18,191 |
-| **F** | nginx + php-fpm | cold, unix socket | 837 | 3,087 | 5,464 | 8,343 | 8,439 |
-| **U** | stokehold | cold, unix socket | 649 | 2,764 | 4,747 | 7,208 | 8,330 |
-| **T** | stokehold | cold, loopback TCP | 657 | 2,855 | 4,767 | 7,091 | 8,110 |
+| **P** | stokehold | warm worker, pipe | 1,789 | 6,892 | 11,522 | 16,696 | 18,655 |
+| **R** | RoadRunner | warm worker, pipe | 1,726 | 6,535 | 10,956 | 17,189 | 17,804 |
+| **F** | nginx + php-fpm | cold, unix socket | 808 | 3,049 | 5,429 | 8,412 | 8,325 |
+| **U** | stokehold | cold, unix socket | 653 | 2,696 | 4,616 | 7,240 | 8,179 |
+| **T** | stokehold | cold, loopback TCP | 650 | 2,838 | 4,736 | 7,014 | 8,014 |
 
-Ratios at c=32: **P/F 2.29×**, **R/F 2.16×**, **T/U 0.97×**.
+Ratios at c=32: **P/F 2.24×**, **R/F 2.14×**, **T/U 0.98×**.
 
 An earlier version of this table showed **P/F and R/F at 1.00× and 1.02×** — "a resident
 worker and nginx + php-fpm are the same speed on this page". That was wrong, and the cause
@@ -141,28 +160,29 @@ iterations × 10 runs. Median of the run medians, milliseconds:
 
 | arm | `GET /` | `GET /items` | vs the warm arms |
 |---|---|---|---|
-| **P** stokehold worker (warm) | 0.332 | **0.556** | 1.00× |
-| **R** RoadRunner (warm) | 0.367 | **0.603** | 1.00× |
-| **F** nginx + php-fpm (cold) | 0.581 | 1.224 | 1.75× / **2.20×** |
-| **U** stokehold cold, unix (cold) | 0.711 | 1.566 | 2.14× / **2.82×** |
-| **T** stokehold cold, TCP (cold) | 0.692 | 1.521 | 2.08× / **2.74×** |
+| **P** stokehold worker (warm) | 0.356 | **0.585** | 1.00× |
+| **R** RoadRunner (warm) | 0.386 | **0.633** | 1.00× |
+| **F** nginx + php-fpm (cold) | 0.592 | 1.242 | 1.66× / **2.12×** |
+| **U** stokehold cold, unix (cold) | 0.701 | 1.521 | 1.97× / **2.60×** |
+| **T** stokehold cold, TCP (cold) | 0.713 | 1.505 | 2.00× / **2.57×** |
 
 Against `azera-competition`'s published `GET /items` for the same application
-(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.20×**, and on `GET /`
-(1.75× against a published 3.06×). So the effect is real, is in the published direction,
+(RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.12×**, and on `GET /`
+(1.66× against a published 3.06×). So the effect is real, is in the published direction,
 and reproduces about two-thirds of its magnitude on this host.
 
-**T and U agree to about 3%** (0.692 vs 0.711; 1.521 vs 1.566), which is inside the 4–8%
+**T and U agree to about 2%** (0.701 vs 0.713; 1.521 vs 1.505), which is inside the 4–8%
 run-to-run spread each arm shows across its ten runs. They did not agree at all before: T
 was 1.656 ms against U's 1.466 ms because of a 40 ms-per-request stall in stokehold's own
 client, not because of the transport. See "What this says about the transport" — that was
 the single largest correction in this report's history, and it moved T by 34×.
 
-> The earlier `841c963` run had these two within 1%. The 3% now is not a regression; it is
-> the same two arms agreeing within the noise, and the *cold* arms on `/items` moved the
-> most of any cell in this re-run (T +5.3%, U +7.4%). Both are within their own spread, and
-> the change that touches them — FastCGI response assembly — was measured at *nothing* on
-> `/items` (hazard 18), so this is drift rather than an effect.
+> The warm arms read ~5–7% slower here than at `ddaada7` (P 0.332 → 0.356 ms, R 0.367 →
+> 0.386) while the cold arms barely moved (F +2%, U −1%, T +3%). Both warm arms moving
+> together, including the one this repository does not build, is the signature of a run
+> effect rather than of stokehold — and the `A,B,B,A` binary comparison above measures the
+> only candidate code change at −0.00%. This pass is 1,000 sequential requests per arm, so
+> it is the most exposed of the three to a host that is not perfectly quiet.
 
 The published 3.1–7.5× was described here as "an endpoint whose work is almost entirely
 container". Measured, the cold arms pay about **1.0 ms** of framework boot per request
@@ -276,8 +296,9 @@ Two things generalise beyond this fix:
 
 ## What this says about the transport
 
-**Loopback TCP and a unix socket are equivalent. T and U agree to 3% at every
-concurrency in every pass, and there is no transport penalty to explain.**
+**Loopback TCP and a unix socket are equivalent. T and U agree to within 4% in the sweep,
+1.04× at c=32 on `/` and 0.98× on `/items`, and to within 2% in the sequential pass — and
+there is no transport penalty to explain.**
 
 This section has been wrong three times, so it is worth stating what the answer finally
 rested on. An earlier version of this report claimed T was **29× slower** than U on
@@ -379,27 +400,29 @@ question a deployment faces: at what load does the resident worker's advantage s
 visible. `scripts/crossover.php` holds it at each of 1..16 with N closed-loop client
 processes, one per connection, each running the same blocking loop `latency.php` uses.
 
-Median of 3 runs x 400 iterations per client, milliseconds. The ratio column is P/F.
+Median of 3 runs x 400 iterations per client, milliseconds. The ratio column is
+**cold-over-warm** (F/P), the direction that reads larger when the resident model is further
+ahead — the convention `scripts/compare_runs.py` also uses.
 
-| conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | P/F | R/F |
+| conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | F/P | F/R |
 |---|---|---|---|---|---|---|---|
-| 1 | 0.575 | 0.606 | 1.212 | 1.536 | 1.523 | **2.11×** | 2.00× |
-| 2 | 0.570 | 0.607 | 1.198 | 1.348 | 1.379 | 2.10× | 1.97× |
-| 4 | 0.589 | 0.625 | 1.231 | 1.338 | 1.330 | 2.09× | 1.97× |
-| 8 | 0.713 | 0.806 | 1.409 | 1.588 | 1.558 | 1.98× | 1.75× |
-| 12 | 0.821 | 0.856 | 1.528 | 1.918 | 1.852 | 1.86× | 1.79× |
-| 16 | 0.899 | 0.986 | 1.806 | 2.119 | 2.069 | **2.01×** | 1.83× |
+| 1 | 0.584 | 0.592 | 1.234 | 1.521 | 1.548 | **2.11×** | 2.08× |
+| 2 | 0.573 | 0.591 | 1.204 | 1.421 | 1.361 | 2.10× | 2.04× |
+| 4 | 0.589 | 0.649 | 1.239 | 1.382 | 1.339 | 2.10× | 1.91× |
+| 8 | 0.722 | 0.748 | 1.382 | 1.617 | 1.604 | 1.91× | 1.85× |
+| 12 | 0.836 | 0.836 | 1.507 | 1.936 | 1.870 | 1.80× | 1.80× |
+| 16 | 0.917 | 0.980 | 1.791 | 2.119 | 2.110 | **1.95×** | 1.83× |
 
-**The advantage does not cross over.** It is ~2.1× at concurrency 1, dips slightly in the
+**The advantage does not cross over.** It is ~2.1× at concurrency 1, dips to ~1.8× in the
 middle, and is back to ~2.0× at 16. That is the opposite of the intuition that a
 per-request boot must eventually be hidden by concurrency, and the CPU numbers below are
 why: the cold arm saturates its CPU budget at ~8,500 rps while the warm arm reaches
-~19,000, so the cold arm is the one already queuing and the gap has no reason to close.
+~18,000, so the cold arm is the one already queuing and the gap has no reason to close.
 
-P and R are now within 8% of each other at every concurrency and within 3% at c=32, where
-the unfixed build had P consistently behind.
+P and R agree to within 10% at every concurrency in this pass, and to within 2% at c=1 and
+at c=12, where they are identical to three decimals.
 
-On `/` the same pass gives a flat **~1.7×** (F/P) and **~1.5×** (F/R) at every concurrency.
+On `/` the same pass gives ~1.7–1.8× (F/P) and ~1.5–1.6× (F/R).
 
 Note that the cold arm's *absolute* penalty is much larger on `/items` (0.58 ms) than on
 `/` (0.18 ms), which is more than a constant boot would explain. The cold arm appears to
@@ -506,6 +529,16 @@ a 200 or a config file, and each one silently produced a plausible wrong number:
   column), because `awk '/50%/'` matched two lines. Anchored and short-circuited now.
 - **A pool file left behind takes the host's php-fpm down for everyone**, which an
   interrupted run did. The teardown is in the `EXIT` trap.
+- **The leftover-php-cgi guard could not see the arms it was guarding.** It matched the
+  literal string `php-cgi -b`, but arms T and U spawn PHP through the `php-cgi-bench`
+  wrapper, which puts its `-d` flags *before* `-b`:
+  `/usr/bin/php-cgi -d opcache.enable_cli=1 … -b 127.0.0.1:19300`. The pattern therefore
+  matched **0** of the 12 children a running arm actually had — measured, on the bench host:
+  0 while twelve were alive, and still 0 after a `kill -9` of the server left all twelve
+  orphaned. The "8 strays" a previous run reported were leftovers from older configs that
+  invoked `/usr/bin/php-cgi` directly, which is why the number looked plausible. It now
+  matches `-b` as its own word through `ps -eww` and runs after **every** arm, refusing to
+  continue if a leak cannot be cleared; a leak can no longer reach an arm that is measured.
 - **php-fpm ran as `www-data` against a `competition`-owned SQLite database** and 500'd
   every request; the pool now runs as the checkout's owner.
 
