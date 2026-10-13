@@ -42,6 +42,11 @@
 #   ROOT      this checkout               (default the script's parent directory)
 set -uo pipefail
 
+# The locale is pinned because the rows are TAB-separated numbers that other tools read
+# back. Under a comma-decimal locale `printf '%.3f'` writes `1,000` where the reader
+# expects `1.000`, and the row silently becomes a different measurement.
+export LC_ALL=C
+
 export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

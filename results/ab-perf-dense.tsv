@@ -1,0 +1,97 @@
+variant	conc	round	endpoint	label	rps	p50	p99
+new-req	12	1	/items	stokehold worker (checksum required)	15662.82	709.00us	1.64ms
+new-req	14	1	/items	stokehold worker (checksum required)	16946.38	741.00us	2.14ms
+new-req	16	1	/items	stokehold worker (checksum required)	17445.32	800.00us	3.60ms
+new-req	18	1	/items	stokehold worker (checksum required)	18313.80	833.00us	5.17ms
+new-req	20	1	/items	stokehold worker (checksum required)	18825.89	0.87ms	6.49ms
+new-req	24	1	/items	stokehold worker (checksum required)	19190.28	0.96ms	9.53ms
+rr	12	1	/items	roadrunner worker	15617.93	696.00us	1.71ms
+rr	14	1	/items	roadrunner worker	16789.76	749.00us	1.91ms
+rr	16	1	/items	roadrunner worker	18074.42	808.00us	2.09ms
+rr	18	1	/items	roadrunner worker	18389.77	0.91ms	2.28ms
+rr	20	1	/items	roadrunner worker	18502.61	1.02ms	2.40ms
+rr	24	1	/items	roadrunner worker	18190.17	1.23ms	2.75ms
+rr	12	2	/items	roadrunner worker	15435.75	699.00us	1.77ms
+rr	14	2	/items	roadrunner worker	16778.94	751.00us	1.95ms
+rr	16	2	/items	roadrunner worker	17778.29	819.00us	2.12ms
+rr	18	2	/items	roadrunner worker	18559.43	0.90ms	2.20ms
+rr	20	2	/items	roadrunner worker	18206.50	1.03ms	2.43ms
+rr	24	2	/items	roadrunner worker	18352.93	1.23ms	2.68ms
+new-req	12	2	/items	stokehold worker (checksum required)	15695.04	713.00us	1.62ms
+new-req	14	2	/items	stokehold worker (checksum required)	16939.05	746.00us	2.18ms
+new-req	16	2	/items	stokehold worker (checksum required)	17547.87	796.00us	3.51ms
+new-req	18	2	/items	stokehold worker (checksum required)	18021.48	845.00us	5.24ms
+new-req	20	2	/items	stokehold worker (checksum required)	18369.13	0.89ms	6.72ms
+new-req	24	2	/items	stokehold worker (checksum required)	18849.08	0.99ms	10.52ms
+new-req	12	3	/items	stokehold worker (checksum required)	15930.67	701.00us	1.64ms
+new-req	14	3	/items	stokehold worker (checksum required)	16952.11	740.00us	2.20ms
+new-req	16	3	/items	stokehold worker (checksum required)	17717.37	790.00us	3.37ms
+new-req	18	3	/items	stokehold worker (checksum required)	18034.00	836.00us	5.60ms
+new-req	20	3	/items	stokehold worker (checksum required)	18302.40	0.89ms	6.77ms
+new-req	24	3	/items	stokehold worker (checksum required)	19082.95	0.99ms	10.12ms
+rr	12	3	/items	roadrunner worker	15305.75	706.00us	1.78ms
+rr	14	3	/items	roadrunner worker	16645.18	757.00us	1.94ms
+rr	16	3	/items	roadrunner worker	17739.63	822.00us	2.10ms
+rr	18	3	/items	roadrunner worker	18551.50	0.90ms	2.26ms
+rr	20	3	/items	roadrunner worker	18696.68	1.01ms	2.38ms
+rr	24	3	/items	roadrunner worker	18363.60	1.22ms	2.67ms
+rr	12	4	/items	roadrunner worker	15574.34	697.00us	1.74ms
+rr	14	4	/items	roadrunner worker	17072.71	744.00us	1.89ms
+rr	16	4	/items	roadrunner worker	17831.41	818.00us	2.09ms
+rr	18	4	/items	roadrunner worker	18216.09	0.91ms	2.29ms
+rr	20	4	/items	roadrunner worker	18666.42	1.01ms	2.32ms
+rr	24	4	/items	roadrunner worker	18716.43	1.22ms	2.62ms
+new-req	12	4	/items	stokehold worker (checksum required)	15823.34	704.00us	1.61ms
+new-req	14	4	/items	stokehold worker (checksum required)	17191.40	728.00us	2.58ms
+new-req	16	4	/items	stokehold worker (checksum required)	17791.42	776.00us	3.73ms
+new-req	18	4	/items	stokehold worker (checksum required)	18224.74	840.00us	4.98ms
+new-req	20	4	/items	stokehold worker (checksum required)	18575.29	0.89ms	6.67ms
+new-req	24	4	/items	stokehold worker (checksum required)	19050.65	0.98ms	10.36ms
+new-req	12	5	/items	stokehold worker (checksum required)	15618.57	709.00us	1.68ms
+new-req	14	5	/items	stokehold worker (checksum required)	16460.56	764.00us	2.12ms
+new-req	16	5	/items	stokehold worker (checksum required)	17441.84	808.00us	3.09ms
+new-req	18	5	/items	stokehold worker (checksum required)	17998.25	0.86ms	4.89ms
+new-req	20	5	/items	stokehold worker (checksum required)	18263.10	0.89ms	6.77ms
+new-req	24	5	/items	stokehold worker (checksum required)	18464.59	1.00ms	10.49ms
+rr	12	5	/items	roadrunner worker	15531.87	699.00us	1.75ms
+rr	14	5	/items	roadrunner worker	16710.83	755.00us	1.92ms
+rr	16	5	/items	roadrunner worker	17552.70	830.00us	2.09ms
+rr	18	5	/items	roadrunner worker	18064.43	0.92ms	2.27ms
+rr	20	5	/items	roadrunner worker	18117.35	1.03ms	2.43ms
+rr	24	5	/items	roadrunner worker	18038.64	1.24ms	2.73ms
+rr	12	6	/items	roadrunner worker	15141.68	710.00us	1.79ms
+rr	14	6	/items	roadrunner worker	16708.66	756.00us	1.96ms
+rr	16	6	/items	roadrunner worker	17331.74	841.00us	2.19ms
+rr	18	6	/items	roadrunner worker	17937.56	0.93ms	2.31ms
+rr	20	6	/items	roadrunner worker	18070.19	1.03ms	2.48ms
+rr	24	6	/items	roadrunner worker	17966.13	1.25ms	2.74ms
+new-req	12	6	/items	stokehold worker (checksum required)	15642.50	713.00us	1.63ms
+new-req	14	6	/items	stokehold worker (checksum required)	16878.94	744.00us	2.28ms
+new-req	16	6	/items	stokehold worker (checksum required)	17648.14	788.00us	3.43ms
+new-req	18	6	/items	stokehold worker (checksum required)	17960.34	849.00us	5.27ms
+new-req	20	6	/items	stokehold worker (checksum required)	18147.12	0.90ms	7.14ms
+new-req	24	6	/items	stokehold worker (checksum required)	18805.60	0.99ms	9.58ms
+new-req	12	7	/items	stokehold worker (checksum required)	15694.11	712.00us	1.66ms
+new-req	14	7	/items	stokehold worker (checksum required)	16925.58	744.00us	2.25ms
+new-req	16	7	/items	stokehold worker (checksum required)	17572.26	787.00us	3.92ms
+new-req	18	7	/items	stokehold worker (checksum required)	17988.52	845.00us	5.35ms
+new-req	20	7	/items	stokehold worker (checksum required)	18567.48	0.87ms	7.26ms
+new-req	24	7	/items	stokehold worker (checksum required)	18527.07	0.98ms	10.77ms
+rr	12	7	/items	roadrunner worker	15528.34	696.00us	1.73ms
+rr	14	7	/items	roadrunner worker	16978.79	747.00us	1.93ms
+rr	16	7	/items	roadrunner worker	17949.05	812.00us	2.11ms
+rr	18	7	/items	roadrunner worker	18284.89	0.91ms	2.24ms
+rr	20	7	/items	roadrunner worker	18645.94	1.01ms	2.39ms
+rr	24	7	/items	roadrunner worker	18356.85	1.23ms	2.69ms
+rr	12	8	/items	roadrunner worker	15314.30	703.00us	1.77ms
+rr	14	8	/items	roadrunner worker	16652.67	756.00us	1.93ms
+rr	16	8	/items	roadrunner worker	17609.47	825.00us	2.16ms
+rr	18	8	/items	roadrunner worker	18059.19	0.92ms	2.30ms
+rr	20	8	/items	roadrunner worker	18322.91	1.02ms	2.44ms
+rr	24	8	/items	roadrunner worker	18189.62	1.24ms	2.69ms
+new-req	12	8	/items	stokehold worker (checksum required)	15607.15	715.00us	1.65ms
+new-req	14	8	/items	stokehold worker (checksum required)	16698.80	755.00us	2.19ms
+new-req	16	8	/items	stokehold worker (checksum required)	17265.00	814.00us	3.43ms
+new-req	18	8	/items	stokehold worker (checksum required)	17629.79	848.00us	5.91ms
+new-req	20	8	/items	stokehold worker (checksum required)	18062.55	0.90ms	6.93ms
+new-req	24	8	/items	stokehold worker (checksum required)	18354.84	1.00ms	11.09ms

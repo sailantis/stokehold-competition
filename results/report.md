@@ -128,7 +128,9 @@ round, which the blocked sweep above cannot do).
 | What was the syscall-buffering pass worth? | **2-6% on `/`, nothing on `/items`** - a fixed cost removed, not a proportional one | A/B, two binaries |
 | Did the `worker_pool.rs` split cost anything? | **no - −0.00% median**, every cell inside the repeat spread | A/B, `A,B,B,A`, two binaries |
 | Is the crc32c fix still worth what it claimed? | **it is worth more, and it is the whole lead** - +10.2% to +16.3% over the reverted build, which is 5.8-12.9% *behind* RoadRunner | interleaved A/B, 168 cells |
-| What does it cost, per process? | **59 µs of server CPU per request** (184 → 125 µs), PHP column unchanged | CPU attribution, 3 builds |
+| What does it cost, per process? | **59 µs of server CPU per request** (184 → 125 µs), PHP column unchanged, and flat across c=8..32 | CPU attribution, 3 builds |
+| Is the c=16 loss a crossover? | **no - a ~1% deficit spread over c=16-20, every round's spread crossing 1.00** | dense A/B, 96 cells |
+| Is anything actually worse? | **the tail - p99 1.6 → 10.4 ms from c=12 to 24 while RoadRunner stays at 1.8 → 2.7 ms** | dense A/B, same 96 cells |
 
 Everything below is the detail behind that table.
 
@@ -506,6 +508,25 @@ smaller than the CPU gain, and why it is not uniform across concurrency. And the
 *identical* across the three builds; it moves by ~6 µs in the same direction as the server column
 because the worker's hash is part of what the option removes, and the residue is run noise.
 
+**And the per-request cost is flat in concurrency, for both servers**, which is what makes the
+one losing cell look like noise rather than a mechanism. Server CPU per request on `/items`,
+median of three rounds at each level:
+
+| concurrency | stokehold | RoadRunner | stokehold's advantage |
+|---|---|---|---|
+| c=8 | 124 µs | 159 µs | −35 µs |
+| c=12 | 121 µs | 160 µs | −39 µs |
+| c=16 | 123 µs | 154 µs | −31 µs |
+| c=20 | 124 µs | 151 µs | −27 µs |
+| c=24 | 124 µs | 152 µs | −28 µs |
+| c=32 | 126 µs | 152 µs | −26 µs |
+
+Stokehold's per-request cost does not move at all across a 4× range of offered load, and
+RoadRunner's moves by 9 µs. If c=16 were a genuine crossover — the point at which stokehold's
+12 slots stop covering the offered concurrency — the stokehold column would be the one to bend
+there. It does not bend anywhere. What *does* move is the tail: see "A single cell that is not a
+crossover, and the tail that is".
+
 ### A correction: hazard 41 measured the checksum against half its own cost
 
 Hazard 41 concluded the optional checksum was "worth about 0.26%", from a microbenchmark that
@@ -523,6 +544,64 @@ attribution is what makes it trustworthy; the throughput medians alone would not
 For this report's purposes the recommendation does not change, and it is worth stating why: the
 checksum's value is integrity, and 3% is not a reason to turn off a corruption check. What changes
 is that the trade is now priced correctly instead of being dismissed as 0.26%.
+
+### A single cell that is not a crossover, and the tail that is
+
+The table above has one cell where RoadRunner wins: `/items` at c=16, −1.7%. The obvious
+reading is a crossover — stokehold's pool has 12 slots and c=16 is the first concurrency
+above it — so it was chased with a denser sweep: the same two variants at c=12, 14, 16, 18,
+20 and 24, eight rounds, a balanced two-variant rotation so each variant starts first four
+times. 96 cells, none failed.
+
+| concurrency | stokehold | RoadRunner | stokehold's lead | per-round spread |
+|---|---|---|---|---|
+| c=12 | 15,678 | 15,482 | +1.3% | 1.003–1.041 |
+| c=14 | 16,932 | 16,745 | +1.1% | 0.985–1.018 |
+| **c=16** | 17,560 | 17,759 | **−1.1%** | 0.965–1.018 |
+| **c=18** | 18,010 | 18,250 | **−1.3%** | 0.971–1.001 |
+| c=20 | 18,336 | 18,413 | −0.4% | 0.979–1.017 |
+| c=24 | 18,827 | 18,272 | +3.0% | 1.009–1.055 |
+
+**There is no crossover.** The deficit is real but shallow (−1%, or about 200 rps out of
+18,000) and it sits in a band from c=16 to c=20, not at a threshold; the spread crosses 1.00
+at c=14, 16, 18 and 20, and the ratio wobbles non-monotonically. At this size a single
+concurrency level is not a meaningful unit — the honest statement is that **between
+concurrency 16 and 20 the two servers are within about 1% of each other, and outside that
+band stokehold leads.** Attributing the c=16 cell to slot exhaustion would have been a story
+the data does not support.
+
+The dense sweep did turn up something the sparse one could not: **a tail-latency divergence
+that has nothing to do with throughput.**
+
+| concurrency | stokehold p99 | RoadRunner p99 | ratio |
+|---|---|---|---|
+| c=12 | 1,640 µs | 1,760 µs | 0.93× |
+| c=14 | 2,195 µs | 1,930 µs | 1.14× |
+| c=16 | 3,470 µs | 2,105 µs | 1.65× |
+| c=18 | 5,255 µs | 2,275 µs | 2.31× |
+| c=20 | 6,770 µs | 2,415 µs | 2.80× |
+| c=24 | 10,425 µs | 2,690 µs | 3.88× |
+
+RoadRunner's tail is **flat** above its slot count, which is what a pool that holds a queue
+looks like. Stokehold's grows without bound and its p50 stays *better* than RoadRunner's at
+every level, so the mean is fine and the tail is not. A p99 that grows with offered load while
+the median improves is a signature of **queueing with no bound on the queue**, not of
+overload — the work is not slower, it is waiting longer before it starts.
+
+The mechanism is a hypothesis and is labelled as one. `pick_slot` (hazard 50's file,
+`worker_pool/mod.rs:355`) advances an atomic cursor and then takes **each candidate slot's
+mutex** until it finds one whose `is_available()` is true; `is_available()` is
+`exchange.is_some() && child has not exited` — it means *the worker is healthy*, not *the slot
+is free*. The mutex is then held across the whole request, so at c=32 thirty-two connection
+threads contend for twelve slot mutexes with no fair queue and no backpressure. That would
+produce exactly this shape. It has not been proven: proving it needs either a per-slot wait-time
+histogram or an experiment that gives the pool a queue, and neither has been run.
+
+This is worth recording as a finding rather than a task because it is not a throughput problem
+and fixing it would not move any number in this report. It is a *deployment* property: a
+`p99` that reaches 10 ms at 24 concurrent connections is visible to a user in a way that a 1%
+throughput deficit is not, and a resident-worker server that is faster on average and worse at
+the tail is a different proposition from one that is faster on both.
 
 ## The crossover — latency under concurrency
 

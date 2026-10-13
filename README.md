@@ -359,6 +359,42 @@ and 3% is not a reason to turn off a corruption check.
 Raw rows are committed — `results/ab-perf.tsv` and `results/cpu-per-request.tsv` — and both
 passes reproduce with `scripts/ab-perf.sh` and `scripts/diag-checksum.sh`.
 
+### The one cell RoadRunner wins is not a crossover, but the tail is real
+
+The table above has a single cell where RoadRunner is ahead — `/items` at c=16, −1.7% — and the
+tempting reading is slot exhaustion, because stokehold's pool has 12 slots and 16 is the first
+concurrency above it. A denser sweep says no: at c=12, 14, 16, 18, 20, 24 the lead is **+1.3%,
++1.1%, −1.1%, −1.3%, −0.4%, +3.0%**, with the per-round spread crossing 1.00 at four of the six
+levels. There is no threshold and no bend; there is a ~1% deficit sitting somewhere between
+c=16 and c=20, which is about 200 rps out of 18,000. Per-request CPU confirms it — stokehold's
+server cost per request is **flat at 121–126 µs from c=8 to c=32**, so nothing changes at 16 for
+it to cross over at.
+
+What the denser sweep *did* find is a tail that diverges while the median does not:
+
+| concurrency | stokehold p99 | RoadRunner p99 |
+|---|---|---|
+| c=12 | 1,640 µs | 1,760 µs |
+| c=16 | 3,470 µs | 2,105 µs |
+| c=20 | 6,770 µs | 2,415 µs |
+| c=24 | 10,425 µs | 2,690 µs |
+
+RoadRunner's tail is flat above its slot count — what a pool with a queue looks like.
+Stokehold's grows with offered load while its **p50 stays better** than RoadRunner's at every
+level. Growing p99 with an improving median is queueing, not slowness: the requests are not
+served slower, they wait longer before being served.
+
+The suspected cause is in `pick_slot`: it advances a cursor and then takes each candidate
+slot's mutex until one reports available, where "available" means the worker is *healthy*, not
+that the slot is *free* — and the mutex is then held across the whole request. Thirty-two
+connection threads contending for twelve slot mutexes with no queue would give exactly this
+shape. **That is a hypothesis and is labelled one**; proving it needs a per-slot wait-time
+histogram or an experiment that gives the pool a queue, and neither has been run.
+
+It is recorded because it is not a throughput problem and would not move any number in this
+report — it is a *user-visible* one. A server that is faster on average and worse at the tail is
+a different proposition from one that is faster on both.
+
 ## What the harness refuses to do
 
 The earlier experiments in this project produced numbers that were wrong in ways
