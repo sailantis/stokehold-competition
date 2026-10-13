@@ -41,6 +41,12 @@ results/*.tsv
 !results/ab-perf-*.tsv
 !results/cpu-per-request.tsv
 !results/cpu-per-request-*.tsv
+# The slot-wait rows are a named deliverable too, and for the same reason: they are the
+# pool's own account of how long requests waited for a slot, measured inside the server so
+# that the client cannot be blamed for them. They are what turns "the tail is probably the
+# queue" into an answer, and the report's table is derived from them.
+!results/slot-waits.tsv
+!results/slot-waits-*.tsv
 results/*.log
 !results/run.log
 *.log

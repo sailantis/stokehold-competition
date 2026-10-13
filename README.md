@@ -264,6 +264,7 @@ project made for several weeks:
 | `latency.php` | 1 | what does one request cost, with nothing to overlap it |
 | `crossover.php` | a range, 1..16 | at what load does the model advantage disappear |
 | `diag-split.sh` / `diag-checksum.sh` | 32 | whose CPU is a request spending — the server's or PHP's |
+| `diag-slots.sh` | 32, with the thread count varied | is the tail the pool's queueing or the load generator's |
 
 They disagree, and the first two are both right. A 12-slot sweep overlaps every
 request's framework boot with eleven other requests, so the boot vanishes from the
@@ -302,6 +303,15 @@ blocking loop `latency.php` uses, and agrees with it to 0.1% at concurrency 1.
 numbers agreeing to 10% is not evidence that either is right. It took attributing
 CPU, rather than measuring wall time more carefully, to find a 3x cost difference
 hidden inside a 10% throughput difference.
+
+The fifth pass exists because the fourth one localises a cost to a *process* and the
+question that followed was about a *mechanism*. The tail in "The one cell RoadRunner
+wins" could have been the pool's queueing or the load generator's own thread
+scheduling — both live in a process, both cost CPU, and `diag-split.sh` cannot tell
+them apart because it attributes CPU rather than time waited. `diag-slots.sh` holds
+concurrency fixed and varies only `wrk`'s thread count, which changes nothing on the
+server side, and reads the pool's own wait histogram from the server's shutdown line.
+The pool's answer settled it: the tail is the pool's, and the client is innocent.
 
 ## Is the lead still there? — yes, and it is one function
 
@@ -384,16 +394,48 @@ Stokehold's grows with offered load while its **p50 stays better** than RoadRunn
 level. Growing p99 with an improving median is queueing, not slowness: the requests are not
 served slower, they wait longer before being served.
 
-The suspected cause is in `pick_slot`: it advances a cursor and then takes each candidate
+The suspected cause was in `pick_slot`: it advances a cursor and then takes each candidate
 slot's mutex until one reports available, where "available" means the worker is *healthy*, not
-that the slot is *free* — and the mutex is then held across the whole request. Thirty-two
-connection threads contending for twelve slot mutexes with no queue would give exactly this
-shape. **That is a hypothesis and is labelled one**; proving it needs a per-slot wait-time
-histogram or an experiment that gives the pool a queue, and neither has been run.
+that the slot is *free* — and the mutex is then held across the whole request.
 
-It is recorded because it is not a throughput problem and would not move any number in this
-report — it is a *user-visible* one. A server that is faster on average and worse at the tail is
-a different proposition from one that is faster on both.
+**That was a hypothesis. It has since been measured, and it holds.** The pool now times every
+request from asking for a slot to holding one, per slot, and counts those waits into a
+powers-of-two histogram so it can report its own p50 and p99; the server prints both at shutdown
+(stokehold `4dd402a`, `a6df392`). Because the figure is produced inside the server it cannot
+contain anything the load generator did, which is what makes it evidence rather than a second
+correlation.
+
+First, the load generator was ruled out. This harness drives `wrk` as `-t$c -c$c`, so at c=32 the
+client owns 32 threads on a 12-core box, and that was the other candidate for the tail. Holding
+concurrency at 32 and varying only the thread count changes nothing on the server side:
+
+| client threads | client p99 | pool mean wait | pool p99 wait |
+|---|---|---|---|
+| 2 | 17.80 ms | 895 µs | 16.4 ms |
+| 32 | 18.33 ms | 898 µs | 16.4 ms |
+
+Then, with concurrency equal to the thread count (`scripts/diag-slots.sh`):
+
+| concurrency | excess over 12 workers | client p50 | client p99 | pool mean | pool p50 | pool p99 | client `p99−p50` | pool `p99−p50` |
+|---|---|---|---|---|---|---|---|---|
+| 12 | 0 | 0.71 ms | 1.68 ms | 34 µs | 2 µs | 1.02 ms | 0.97 ms | 1.02 ms |
+| 16 | 4 | 0.79 ms | 3.94 ms | 157 µs | 3 µs | 2.05 ms | 3.15 ms | 2.05 ms |
+| 20 | 8 | 0.88 ms | 7.68 ms | 325 µs | 4 µs | 8.19 ms | 6.80 ms | 8.19 ms |
+| 24 | 12 | 0.97 ms | 10.74 ms | 509 µs | 4 µs | 8.19 ms | 9.77 ms | 8.19 ms |
+| 32 | 20 | 1.16 ms | 18.98 ms | 906 µs | 19 µs | 16.4 ms | 17.82 ms | 16.37 ms |
+
+The wait **grows from concurrency 13 rather than stepping** — a step would mean waiting for the
+one request already in front of you, and 34 → 157 → 325 → 509 → 906 µs across 0 → 4 → 8 → 12 → 20
+excess clients is a queue accumulating instead. It is **unfairness, not slowness**: the pool's
+median wait is 2−19 µs while its p99 is 1−16 ms, most requests take an uncontended mutex and a
+few wait for whole requests, and the pool's `p99 − p50` tracks the client's at every level. And
+the mean is a real cost besides: at c=32 a request spends **0.91 ms of its 1.69 ms** waiting for a
+busy worker.
+
+It is still recorded as a deployment property rather than a throughput one — nothing in the
+tables above moves, and throughput at c=24 is already 4% ahead. What is no longer open is whether
+the tail is real or whose it is. What *is* still open is which fix: `try_lock` in the scan, or a
+real fair queue. Both are consistent with this data and neither has been built or compared.
 
 ## What the harness refuses to do
 
@@ -479,6 +521,7 @@ conf/                   one stamped config per arm
 scripts/bench.sh        the harness
 scripts/diag-split.sh   CPU per request: server process vs PHP workers
 scripts/diag-profile.sh perf record on the server process, flat symbol report
+scripts/diag-slots.sh   the pool's own slot-wait histogram vs the client's p99
 results/                published numbers
 ```
 

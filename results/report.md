@@ -594,14 +594,82 @@ mutex** until it finds one whose `is_available()` is true; `is_available()` is
 `exchange.is_some() && child has not exited` — it means *the worker is healthy*, not *the slot
 is free*. The mutex is then held across the whole request, so at c=32 thirty-two connection
 threads contend for twelve slot mutexes with no fair queue and no backpressure. That would
-produce exactly this shape. It has not been proven: proving it needs either a per-slot wait-time
-histogram or an experiment that gives the pool a queue, and neither has been run.
+produce exactly this shape.
 
 This is worth recording as a finding rather than a task because it is not a throughput problem
 and fixing it would not move any number in this report. It is a *deployment* property: a
 `p99` that reaches 10 ms at 24 concurrent connections is visible to a user in a way that a 1%
 throughput deficit is not, and a resident-worker server that is faster on average and worse at
 the tail is a different proposition from one that is faster on both.
+
+#### The hypothesis, tested
+
+The pool now measures it. `wait_us` accumulates, per slot, the time each request spent between
+asking for a slot and holding one, and counts each wait into powers of two so a percentile can
+be read out of it. Both figures are produced *inside the server* and printed at shutdown
+(stokehold `4dd402a`, `a6df392`), so they cannot include anything a client did.
+`scripts/diag-slots.sh` drives it.
+
+Two experiments were run on the benchmark host, three repeats each, `/items`, 8 s per run.
+
+**First, is the client at fault?** The harness drives `wrk` as `-t$c -c$c`, so concurrency *is*
+the thread count, and at c=32 the load generator owns 32 threads on a 12-core box. Holding
+concurrency at 32 and varying only the thread count changes nothing on the server side:
+
+| client threads | client p50 | client p99 | pool mean wait | pool p99 wait |
+|---|---|---|---|---|
+| 2 | 1.16 ms | **17.80 ms** | 895 µs | 16.4 ms |
+| 32 | 1.19 ms | **18.33 ms** | 898 µs | 16.4 ms |
+
+p99 moves by 3%, and the pool's own figures do not move at all. **The load generator is not the
+cause.** This hypothesis was mine, it was plausible, and the measurement refutes it.
+
+**Second, does it scale with excess clients, as queueing must?** Concurrency equals threads:
+
+| concurrency | excess over 12 workers | client p50 | client p99 | pool mean | pool p50 | pool p99 | pool mean as share of time in system | client `p99−p50` | pool `p99−p50` |
+|---|---|---|---|---|---|---|---|---|---|
+| 12 | 0 | 0.71 ms | 1.68 ms | 34 µs | 2 µs | 1.02 ms | 4% | 0.97 ms | 1.02 ms |
+| 16 | 4 | 0.79 ms | 3.94 ms | 157 µs | 3 µs | 2.05 ms | 17% | 3.15 ms | 2.05 ms |
+| 20 | 8 | 0.88 ms | 7.68 ms | 325 µs | 4 µs | 8.19 ms | 30% | 6.80 ms | 8.19 ms |
+| 24 | 12 | 0.97 ms | 10.74 ms | 509 µs | 4 µs | 8.19 ms | 40% | 9.77 ms | 8.19 ms |
+| 32 | 20 | 1.16 ms | 18.98 ms | 906 µs | 19 µs | 16.4 ms | 54% | 17.82 ms | 16.37 ms |
+
+Three things in that table are the finding.
+
+- **The growth starts at concurrency 13, not at a plateau.** This kills a hypothesis I had
+  offered earlier in this work — that a request is served the instant the cursor points at a
+  free slot, so the wait is a step at c = workers + 1 and flat thereafter. A step shape would
+  be *scheduling*: wait for the one request already in front of you. This shape — 34, 157,
+  325, 509, 906 µs across 0, 4, 8, 12, 20 excess clients — is *accumulating queue*: each new
+  client waits for everything queued ahead of it. The old docstring's claim that the scan
+  "never blocks on a busy worker" is not merely imprecise, it described a design that is not
+  what runs.
+- **It is unfairness, not slowness.** The pool's median wait is 2–19 µs while its p99 is
+  1–16 ms. Most requests are served immediately through an uncontended mutex; a few wait for
+  whole requests. That is a queue with no bound and no fairness, and it is exactly the shape
+  the client sees: the pool's own `p99−p50` tracks the client's `p99−p50` at every level
+  (1.02 vs 0.97 ms, 2.05 vs 3.15, 8.19 vs 6.80, 8.19 vs 9.77, 16.37 vs 17.82). The tail is
+  the pool's, and it is 84–105% of the client's excess over its own median.
+- **The mean is legitimate and it is a real cost.** The pool's mean wait is a growing share of
+  the client's mean time in system — 4% at c=12 rising to **54% at c=32**, where a request
+  spends 0.91 ms of its 1.69 ms waiting for a slot. It is not pure tail: half the request's
+  average latency at high concurrency is spent waiting for a worker that is busy with someone
+  else, which is the throughput plateau in another form. A fair queue would not remove that
+  time; it would spread it evenly instead of concentrating it, which is a latency *variance*
+  fix rather than a latency fix.
+
+So the hypothesis is confirmed with a correction: the pool does not block waiting for a
+specific busy worker by round-robin luck, as the original wording had it. It accumulates an
+unbounded queue behind mutexes taken without fairness, and the queue grows with offered load
+because nothing pushes back.
+
+**What this does not yet say** is which change is worth making. The measurement identifies the
+defect and its magnitude; it does not compare candidate fixes. Giving the pool a fair queue, or
+making the scan take `try_lock` so a request skips a busy slot instead of queueing for it, are
+both consistent with this data and would need to be built and measured. What is now settled is
+that there *is* something to fix, that it is in `pick_slot`, and that it is worth 0.9 ms of mean
+latency and a 16 ms p99 at c=32 — which is enough to justify the work that a hypothesis alone
+was not.
 
 ## The crossover — latency under concurrency
 
