@@ -2,25 +2,25 @@
 # Which syscall owns the 40 ms?
 #
 # The wire trace shows php-cgi's trailing 1728-byte segment leaving 10 us after
-# stokehold's ACK arrives, and the ACK arriving 40 ms after the data. Two candidate
+# volucer's ACK arrives, and the ACK arriving 40 ms after the data. Two candidate
 # mechanisms remain, and they need different fixes:
 #
 #   a) php-cgi never set TCP_NODELAY, so Nagle holds the trailing short segment until
-#      the ACK arrives. Fix belongs to the sender; on stokehold's side the mitigation
+#      the ACK arrives. Fix belongs to the sender; on volucer's side the mitigation
 #      is to make the receiver ACK immediately (TCP_QUICKACK).
 #   b) php-cgi set TCP_NODELAY and is blocked somewhere else, in which case Nagle is
 #      not involved and the 40 ms has another owner.
 #
 # `fastcgi.c` line 1088 is the discriminator: php-cgi sets TCP_NODELAY only when the
-# BEGIN_REQUEST carried FCGI_KEEP_CONN. stokehold does send that flag, so (a) should
+# BEGIN_REQUEST carried FCGI_KEEP_CONN. volucer does send that flag, so (a) should
 # be false — which is exactly why this is worth checking rather than assuming.
 #
 # Usage: bash diag-strace.sh
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 DIR="$(mktemp -d /tmp/diag-strace.XXXXXX)"
 PHP_CGI="$(command -v php-cgi)"
 PORT=19560
@@ -100,5 +100,5 @@ echo "=== the socket calls with their timestamps ==="
 grep -E 'setsockopt|sendto|recvfrom' "$DIR/strace.txt" | head -40
 
 echo
-echo "=== stokehold log ==="
+echo "=== volucer log ==="
 tail -5 "$DIR/server.log"

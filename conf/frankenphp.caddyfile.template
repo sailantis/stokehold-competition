@@ -2,7 +2,7 @@
 #
 # This is the sixth arm, and the reason it is interesting is architectural rather
 # than incremental: FrankenPHP embeds the PHP interpreter inside its own process
-# (Caddy + a ZTS PHP built in), which is the one approach stokehold deliberately
+# (Caddy + a ZTS PHP built in), which is the one approach volucer deliberately
 # rejects — no embedding, no FFI, always an external `php` process (see the plan's
 # constraints section). Every other arm here spawns PHP; this one *is* PHP. If the
 # question "what would embedding have bought us" is ever asked, this arm is the
@@ -54,7 +54,7 @@
 
 		# `max_requests` is 0 (unlimited) by default, and it is stated rather than
 		# left implicit because it is the setting the other three arms are matched
-		# on: stokehold `max_requests = 0`, RoadRunner `max_jobs: 0`, FPM
+		# on: volucer `max_requests = 0`, RoadRunner `max_jobs: 0`, FPM
 		# `pm.max_requests = 0`. A non-zero value here would recycle the warm
 		# framework and quietly turn this into a cold arm partway through a run.
 		max_requests 0

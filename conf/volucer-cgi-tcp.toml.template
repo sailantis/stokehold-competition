@@ -1,4 +1,4 @@
-# ARM T — stokehold + spawn_cgi over LOOPBACK TCP.
+# ARM T — volucer + spawn_cgi over LOOPBACK TCP.
 #
 # The cold model: each `php-cgi` child gives every request a full CGI SAPI reset,
 # so the front controller re-runs and the framework boots per request — the same

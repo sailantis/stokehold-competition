@@ -8,7 +8,7 @@
 # the second. No file in the checkout is modified.
 set -uo pipefail
 FP=/home/competition/bin/frankenphp
-A=/home/competition/workspace/stokehold-competition
+A=/home/competition/workspace/volucer-competition
 R=/home/competition/fp-guard
 PORT=18995
 rm -rf "$R"; mkdir -p "$R"

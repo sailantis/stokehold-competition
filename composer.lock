@@ -608,16 +608,16 @@
             "time": "2026-10-10T18:58:35+00:00"
         },
         {
-            "name": "sailantis/stokehold-worker",
+            "name": "sailantis/volucer-worker",
             "version": "dev-main",
             "source": {
                 "type": "git",
-                "url": "https://github.com/sailantis/stokehold-php-sdk.git",
+                "url": "https://github.com/sailantis/volucer-php-sdk.git",
                 "reference": "475bfd2b15508c6611b8435f92e5836ee8210ba7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sailantis/stokehold-php-sdk/zipball/475bfd2b15508c6611b8435f92e5836ee8210ba7",
+                "url": "https://api.github.com/repos/sailantis/volucer-php-sdk/zipball/475bfd2b15508c6611b8435f92e5836ee8210ba7",
                 "reference": "475bfd2b15508c6611b8435f92e5836ee8210ba7",
                 "shasum": ""
             },
@@ -635,12 +635,12 @@
             },
             "autoload": {
                 "psr-4": {
-                    "Stokehold\\": "src/"
+                    "Volucer\\": "src/"
                 }
             },
             "autoload-dev": {
                 "psr-4": {
-                    "Stokehold\\Tests\\": "tests/"
+                    "Volucer\\Tests\\": "tests/"
                 }
             },
             "scripts": {
@@ -651,17 +651,17 @@
             "license": [
                 "MIT"
             ],
-            "description": "The PHP worker SDK for stokehold: serves requests over the stokehold worker protocol.",
+            "description": "The PHP worker SDK for volucer: serves requests over the volucer worker protocol.",
             "keywords": [
                 "application-server",
                 "php-fpm",
                 "roadrunner",
-                "stokehold",
+                "volucer",
                 "worker"
             ],
             "support": {
-                "issues": "https://github.com/sailantis/stokehold-php-sdk/issues",
-                "source": "https://github.com/sailantis/stokehold-php-sdk"
+                "issues": "https://github.com/sailantis/volucer-php-sdk/issues",
+                "source": "https://github.com/sailantis/volucer-php-sdk"
             },
             "time": "2026-10-11T13:30:48+00:00"
         },
@@ -1063,7 +1063,7 @@
     "stability-flags": {
         "sailantis/azera-framework": 20,
         "sailantis/clarity-engine": 20,
-        "sailantis/stokehold-worker": 20
+        "sailantis/volucer-worker": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

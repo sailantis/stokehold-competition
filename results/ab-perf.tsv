@@ -1,169 +1,169 @@
 variant	conc	round	endpoint	label	rps	p50	p99
-new-req	8	1	/	stokehold worker (checksum required)	23640.91	320.00us	618.00us
-new-req	16	1	/	stokehold worker (checksum required)	36056.71	400.00us	1.28ms
-new-req	32	1	/	stokehold worker (checksum required)	38062.99	636.00us	7.48ms
-new-req	8	1	/items	stokehold worker (checksum required)	11721.59	636.00us	1.23ms
-new-req	16	1	/items	stokehold worker (checksum required)	17143.57	824.00us	3.29ms
-new-req	32	1	/items	stokehold worker (checksum required)	19191.09	1.25ms	14.97ms
-new-opt	8	1	/	stokehold worker (checksum optional)	24450.07	310.00us	591.00us
-new-opt	16	1	/	stokehold worker (checksum optional)	37021.63	390.00us	1.25ms
-new-opt	32	1	/	stokehold worker (checksum optional)	39336.18	618.00us	6.91ms
-new-opt	8	1	/items	stokehold worker (checksum optional)	12079.30	620.00us	1.23ms
-new-opt	16	1	/items	stokehold worker (checksum optional)	17600.81	798.00us	3.03ms
-new-opt	32	1	/items	stokehold worker (checksum optional)	19914.77	1.18ms	16.83ms
-old-req	8	1	/	stokehold worker (pre-crc32c-fix)	20594.50	369.00us	692.00us
-old-req	16	1	/	stokehold worker (pre-crc32c-fix)	31929.02	451.00us	1.48ms
-old-req	32	1	/	stokehold worker (pre-crc32c-fix)	32513.43	730.00us	9.05ms
-old-req	8	1	/items	stokehold worker (pre-crc32c-fix)	10589.16	713.00us	1.33ms
-old-req	16	1	/items	stokehold worker (pre-crc32c-fix)	15336.56	0.91ms	3.37ms
-old-req	32	1	/items	stokehold worker (pre-crc32c-fix)	16908.73	1.38ms	16.90ms
+new-req	8	1	/	volucer worker (checksum required)	23640.91	320.00us	618.00us
+new-req	16	1	/	volucer worker (checksum required)	36056.71	400.00us	1.28ms
+new-req	32	1	/	volucer worker (checksum required)	38062.99	636.00us	7.48ms
+new-req	8	1	/items	volucer worker (checksum required)	11721.59	636.00us	1.23ms
+new-req	16	1	/items	volucer worker (checksum required)	17143.57	824.00us	3.29ms
+new-req	32	1	/items	volucer worker (checksum required)	19191.09	1.25ms	14.97ms
+new-opt	8	1	/	volucer worker (checksum optional)	24450.07	310.00us	591.00us
+new-opt	16	1	/	volucer worker (checksum optional)	37021.63	390.00us	1.25ms
+new-opt	32	1	/	volucer worker (checksum optional)	39336.18	618.00us	6.91ms
+new-opt	8	1	/items	volucer worker (checksum optional)	12079.30	620.00us	1.23ms
+new-opt	16	1	/items	volucer worker (checksum optional)	17600.81	798.00us	3.03ms
+new-opt	32	1	/items	volucer worker (checksum optional)	19914.77	1.18ms	16.83ms
+old-req	8	1	/	volucer worker (pre-crc32c-fix)	20594.50	369.00us	692.00us
+old-req	16	1	/	volucer worker (pre-crc32c-fix)	31929.02	451.00us	1.48ms
+old-req	32	1	/	volucer worker (pre-crc32c-fix)	32513.43	730.00us	9.05ms
+old-req	8	1	/items	volucer worker (pre-crc32c-fix)	10589.16	713.00us	1.33ms
+old-req	16	1	/items	volucer worker (pre-crc32c-fix)	15336.56	0.91ms	3.37ms
+old-req	32	1	/items	volucer worker (pre-crc32c-fix)	16908.73	1.38ms	16.90ms
 rr	8	1	/	roadrunner worker	20475.40	357.00us	0.97ms
 rr	16	1	/	roadrunner worker	34473.68	418.00us	1.44ms
 rr	32	1	/	roadrunner worker	36663.34	814.00us	2.08ms
 rr	8	1	/items	roadrunner worker	11344.35	641.00us	1.50ms
 rr	16	1	/items	roadrunner worker	17660.53	827.00us	2.10ms
 rr	32	1	/items	roadrunner worker	18020.34	1.68ms	3.32ms
-new-opt	8	2	/	stokehold worker (checksum optional)	23639.29	320.00us	614.00us
-new-opt	16	2	/	stokehold worker (checksum optional)	35987.41	402.00us	1.31ms
-new-opt	32	2	/	stokehold worker (checksum optional)	39135.51	628.00us	6.57ms
-new-opt	8	2	/items	stokehold worker (checksum optional)	12000.37	626.00us	1.23ms
-new-opt	16	2	/items	stokehold worker (checksum optional)	17512.18	803.00us	3.03ms
-new-opt	32	2	/items	stokehold worker (checksum optional)	19595.61	1.20ms	15.28ms
-old-req	8	2	/	stokehold worker (pre-crc32c-fix)	21356.25	356.00us	648.00us
-old-req	16	2	/	stokehold worker (pre-crc32c-fix)	32076.83	449.00us	1.52ms
-old-req	32	2	/	stokehold worker (pre-crc32c-fix)	32981.27	720.00us	8.87ms
-old-req	8	2	/items	stokehold worker (pre-crc32c-fix)	10577.82	707.00us	1.33ms
-old-req	16	2	/items	stokehold worker (pre-crc32c-fix)	15265.79	0.92ms	3.30ms
-old-req	32	2	/items	stokehold worker (pre-crc32c-fix)	16758.27	1.40ms	15.60ms
+new-opt	8	2	/	volucer worker (checksum optional)	23639.29	320.00us	614.00us
+new-opt	16	2	/	volucer worker (checksum optional)	35987.41	402.00us	1.31ms
+new-opt	32	2	/	volucer worker (checksum optional)	39135.51	628.00us	6.57ms
+new-opt	8	2	/items	volucer worker (checksum optional)	12000.37	626.00us	1.23ms
+new-opt	16	2	/items	volucer worker (checksum optional)	17512.18	803.00us	3.03ms
+new-opt	32	2	/items	volucer worker (checksum optional)	19595.61	1.20ms	15.28ms
+old-req	8	2	/	volucer worker (pre-crc32c-fix)	21356.25	356.00us	648.00us
+old-req	16	2	/	volucer worker (pre-crc32c-fix)	32076.83	449.00us	1.52ms
+old-req	32	2	/	volucer worker (pre-crc32c-fix)	32981.27	720.00us	8.87ms
+old-req	8	2	/items	volucer worker (pre-crc32c-fix)	10577.82	707.00us	1.33ms
+old-req	16	2	/items	volucer worker (pre-crc32c-fix)	15265.79	0.92ms	3.30ms
+old-req	32	2	/items	volucer worker (pre-crc32c-fix)	16758.27	1.40ms	15.60ms
 rr	8	2	/	roadrunner worker	20061.18	365.00us	0.97ms
 rr	16	2	/	roadrunner worker	33931.08	428.00us	1.44ms
 rr	32	2	/	roadrunner worker	36039.40	828.00us	2.10ms
 rr	8	2	/items	roadrunner worker	11253.45	642.00us	1.53ms
 rr	16	2	/items	roadrunner worker	17516.79	832.00us	2.14ms
 rr	32	2	/items	roadrunner worker	17814.00	1.69ms	3.35ms
-new-req	8	2	/	stokehold worker (checksum required)	23671.76	320.00us	616.00us
-new-req	16	2	/	stokehold worker (checksum required)	34883.21	415.00us	1.29ms
-new-req	32	2	/	stokehold worker (checksum required)	37310.05	647.00us	7.25ms
-new-req	8	2	/items	stokehold worker (checksum required)	11653.93	645.00us	1.25ms
-new-req	16	2	/items	stokehold worker (checksum required)	17213.73	825.00us	2.94ms
-new-req	32	2	/items	stokehold worker (checksum required)	19062.42	1.24ms	14.58ms
-old-req	8	3	/	stokehold worker (pre-crc32c-fix)	21305.14	358.00us	650.00us
-old-req	16	3	/	stokehold worker (pre-crc32c-fix)	31244.89	461.00us	1.44ms
-old-req	32	3	/	stokehold worker (pre-crc32c-fix)	32715.06	731.00us	8.33ms
-old-req	8	3	/items	stokehold worker (pre-crc32c-fix)	10645.43	704.00us	1.31ms
-old-req	16	3	/items	stokehold worker (pre-crc32c-fix)	15374.10	0.91ms	3.69ms
-old-req	32	3	/items	stokehold worker (pre-crc32c-fix)	17013.77	1.39ms	18.22ms
+new-req	8	2	/	volucer worker (checksum required)	23671.76	320.00us	616.00us
+new-req	16	2	/	volucer worker (checksum required)	34883.21	415.00us	1.29ms
+new-req	32	2	/	volucer worker (checksum required)	37310.05	647.00us	7.25ms
+new-req	8	2	/items	volucer worker (checksum required)	11653.93	645.00us	1.25ms
+new-req	16	2	/items	volucer worker (checksum required)	17213.73	825.00us	2.94ms
+new-req	32	2	/items	volucer worker (checksum required)	19062.42	1.24ms	14.58ms
+old-req	8	3	/	volucer worker (pre-crc32c-fix)	21305.14	358.00us	650.00us
+old-req	16	3	/	volucer worker (pre-crc32c-fix)	31244.89	461.00us	1.44ms
+old-req	32	3	/	volucer worker (pre-crc32c-fix)	32715.06	731.00us	8.33ms
+old-req	8	3	/items	volucer worker (pre-crc32c-fix)	10645.43	704.00us	1.31ms
+old-req	16	3	/items	volucer worker (pre-crc32c-fix)	15374.10	0.91ms	3.69ms
+old-req	32	3	/items	volucer worker (pre-crc32c-fix)	17013.77	1.39ms	18.22ms
 rr	8	3	/	roadrunner worker	20228.46	363.00us	0.99ms
 rr	16	3	/	roadrunner worker	34200.41	422.00us	1.42ms
 rr	32	3	/	roadrunner worker	36431.48	814.00us	2.07ms
 rr	8	3	/items	roadrunner worker	11302.89	646.00us	1.53ms
 rr	16	3	/items	roadrunner worker	17379.50	841.00us	2.15ms
 rr	32	3	/items	roadrunner worker	18327.60	1.67ms	3.22ms
-new-req	8	3	/	stokehold worker (checksum required)	24399.87	310.00us	603.00us
-new-req	16	3	/	stokehold worker (checksum required)	36370.33	397.00us	1.35ms
-new-req	32	3	/	stokehold worker (checksum required)	38206.80	630.00us	6.74ms
-new-req	8	3	/items	stokehold worker (checksum required)	11531.64	649.00us	1.26ms
-new-req	16	3	/items	stokehold worker (checksum required)	17089.83	822.00us	3.42ms
-new-req	32	3	/items	stokehold worker (checksum required)	18978.36	1.25ms	15.21ms
-new-opt	8	3	/	stokehold worker (checksum optional)	24084.33	312.00us	604.00us
-new-opt	16	3	/	stokehold worker (checksum optional)	36138.07	399.00us	1.36ms
-new-opt	32	3	/	stokehold worker (checksum optional)	38197.98	633.00us	6.97ms
-new-opt	8	3	/items	stokehold worker (checksum optional)	11800.11	637.00us	1.22ms
-new-opt	16	3	/items	stokehold worker (checksum optional)	17631.53	797.00us	2.99ms
-new-opt	32	3	/items	stokehold worker (checksum optional)	20018.60	1.18ms	15.55ms
+new-req	8	3	/	volucer worker (checksum required)	24399.87	310.00us	603.00us
+new-req	16	3	/	volucer worker (checksum required)	36370.33	397.00us	1.35ms
+new-req	32	3	/	volucer worker (checksum required)	38206.80	630.00us	6.74ms
+new-req	8	3	/items	volucer worker (checksum required)	11531.64	649.00us	1.26ms
+new-req	16	3	/items	volucer worker (checksum required)	17089.83	822.00us	3.42ms
+new-req	32	3	/items	volucer worker (checksum required)	18978.36	1.25ms	15.21ms
+new-opt	8	3	/	volucer worker (checksum optional)	24084.33	312.00us	604.00us
+new-opt	16	3	/	volucer worker (checksum optional)	36138.07	399.00us	1.36ms
+new-opt	32	3	/	volucer worker (checksum optional)	38197.98	633.00us	6.97ms
+new-opt	8	3	/items	volucer worker (checksum optional)	11800.11	637.00us	1.22ms
+new-opt	16	3	/items	volucer worker (checksum optional)	17631.53	797.00us	2.99ms
+new-opt	32	3	/items	volucer worker (checksum optional)	20018.60	1.18ms	15.55ms
 rr	8	4	/	roadrunner worker	20417.86	359.00us	0.95ms
 rr	16	4	/	roadrunner worker	34358.03	424.00us	1.36ms
 rr	32	4	/	roadrunner worker	36652.81	810.00us	2.08ms
 rr	8	4	/items	roadrunner worker	11363.48	638.00us	1.55ms
 rr	16	4	/items	roadrunner worker	17606.17	824.00us	2.11ms
 rr	32	4	/items	roadrunner worker	17833.77	1.69ms	3.37ms
-new-req	8	4	/	stokehold worker (checksum required)	23880.79	316.00us	612.00us
-new-req	16	4	/	stokehold worker (checksum required)	35550.86	407.00us	1.38ms
-new-req	32	4	/	stokehold worker (checksum required)	38142.51	635.00us	7.22ms
-new-req	8	4	/items	stokehold worker (checksum required)	11557.60	650.00us	1.25ms
-new-req	16	4	/items	stokehold worker (checksum required)	17210.31	822.00us	3.10ms
-new-req	32	4	/items	stokehold worker (checksum required)	19370.82	1.22ms	16.39ms
-new-opt	8	4	/	stokehold worker (checksum optional)	24373.51	311.00us	598.00us
-new-opt	16	4	/	stokehold worker (checksum optional)	36567.01	396.00us	1.24ms
-new-opt	32	4	/	stokehold worker (checksum optional)	39093.24	617.00us	7.49ms
-new-opt	8	4	/items	stokehold worker (checksum optional)	11941.64	629.00us	1.22ms
-new-opt	16	4	/items	stokehold worker (checksum optional)	17736.10	792.00us	3.25ms
-new-opt	32	4	/items	stokehold worker (checksum optional)	19571.93	1.18ms	16.13ms
-old-req	8	4	/	stokehold worker (pre-crc32c-fix)	21334.42	357.00us	655.00us
-old-req	16	4	/	stokehold worker (pre-crc32c-fix)	32114.00	448.00us	1.49ms
-old-req	32	4	/	stokehold worker (pre-crc32c-fix)	33082.18	725.00us	8.33ms
-old-req	8	4	/items	stokehold worker (pre-crc32c-fix)	10636.28	705.00us	1.31ms
-old-req	16	4	/items	stokehold worker (pre-crc32c-fix)	15345.99	0.91ms	3.40ms
-old-req	32	4	/items	stokehold worker (pre-crc32c-fix)	16818.09	1.41ms	17.47ms
-new-req	8	5	/	stokehold worker (checksum required)	24141.89	314.00us	601.00us
-new-req	16	5	/	stokehold worker (checksum required)	35919.09	401.00us	1.41ms
-new-req	32	5	/	stokehold worker (checksum required)	38713.59	628.00us	6.61ms
-new-req	8	5	/items	stokehold worker (checksum required)	11838.34	632.00us	1.24ms
-new-req	16	5	/items	stokehold worker (checksum required)	17252.89	816.00us	3.23ms
-new-req	32	5	/items	stokehold worker (checksum required)	19477.47	1.20ms	15.98ms
-new-opt	8	5	/	stokehold worker (checksum optional)	24512.55	309.00us	601.00us
-new-opt	16	5	/	stokehold worker (checksum optional)	36984.03	390.00us	1.28ms
-new-opt	32	5	/	stokehold worker (checksum optional)	38840.48	626.00us	7.06ms
-new-opt	8	5	/items	stokehold worker (checksum optional)	11709.58	635.00us	1.24ms
-new-opt	16	5	/items	stokehold worker (checksum optional)	17205.33	816.00us	3.18ms
-new-opt	32	5	/items	stokehold worker (checksum optional)	19376.83	1.18ms	16.21ms
-old-req	8	5	/	stokehold worker (pre-crc32c-fix)	21598.14	351.00us	641.00us
-old-req	16	5	/	stokehold worker (pre-crc32c-fix)	32515.79	444.00us	1.41ms
-old-req	32	5	/	stokehold worker (pre-crc32c-fix)	33029.85	721.00us	7.97ms
-old-req	8	5	/items	stokehold worker (pre-crc32c-fix)	10638.45	706.00us	1.32ms
-old-req	16	5	/items	stokehold worker (pre-crc32c-fix)	15287.97	0.91ms	3.69ms
-old-req	32	5	/items	stokehold worker (pre-crc32c-fix)	16907.79	1.39ms	17.59ms
+new-req	8	4	/	volucer worker (checksum required)	23880.79	316.00us	612.00us
+new-req	16	4	/	volucer worker (checksum required)	35550.86	407.00us	1.38ms
+new-req	32	4	/	volucer worker (checksum required)	38142.51	635.00us	7.22ms
+new-req	8	4	/items	volucer worker (checksum required)	11557.60	650.00us	1.25ms
+new-req	16	4	/items	volucer worker (checksum required)	17210.31	822.00us	3.10ms
+new-req	32	4	/items	volucer worker (checksum required)	19370.82	1.22ms	16.39ms
+new-opt	8	4	/	volucer worker (checksum optional)	24373.51	311.00us	598.00us
+new-opt	16	4	/	volucer worker (checksum optional)	36567.01	396.00us	1.24ms
+new-opt	32	4	/	volucer worker (checksum optional)	39093.24	617.00us	7.49ms
+new-opt	8	4	/items	volucer worker (checksum optional)	11941.64	629.00us	1.22ms
+new-opt	16	4	/items	volucer worker (checksum optional)	17736.10	792.00us	3.25ms
+new-opt	32	4	/items	volucer worker (checksum optional)	19571.93	1.18ms	16.13ms
+old-req	8	4	/	volucer worker (pre-crc32c-fix)	21334.42	357.00us	655.00us
+old-req	16	4	/	volucer worker (pre-crc32c-fix)	32114.00	448.00us	1.49ms
+old-req	32	4	/	volucer worker (pre-crc32c-fix)	33082.18	725.00us	8.33ms
+old-req	8	4	/items	volucer worker (pre-crc32c-fix)	10636.28	705.00us	1.31ms
+old-req	16	4	/items	volucer worker (pre-crc32c-fix)	15345.99	0.91ms	3.40ms
+old-req	32	4	/items	volucer worker (pre-crc32c-fix)	16818.09	1.41ms	17.47ms
+new-req	8	5	/	volucer worker (checksum required)	24141.89	314.00us	601.00us
+new-req	16	5	/	volucer worker (checksum required)	35919.09	401.00us	1.41ms
+new-req	32	5	/	volucer worker (checksum required)	38713.59	628.00us	6.61ms
+new-req	8	5	/items	volucer worker (checksum required)	11838.34	632.00us	1.24ms
+new-req	16	5	/items	volucer worker (checksum required)	17252.89	816.00us	3.23ms
+new-req	32	5	/items	volucer worker (checksum required)	19477.47	1.20ms	15.98ms
+new-opt	8	5	/	volucer worker (checksum optional)	24512.55	309.00us	601.00us
+new-opt	16	5	/	volucer worker (checksum optional)	36984.03	390.00us	1.28ms
+new-opt	32	5	/	volucer worker (checksum optional)	38840.48	626.00us	7.06ms
+new-opt	8	5	/items	volucer worker (checksum optional)	11709.58	635.00us	1.24ms
+new-opt	16	5	/items	volucer worker (checksum optional)	17205.33	816.00us	3.18ms
+new-opt	32	5	/items	volucer worker (checksum optional)	19376.83	1.18ms	16.21ms
+old-req	8	5	/	volucer worker (pre-crc32c-fix)	21598.14	351.00us	641.00us
+old-req	16	5	/	volucer worker (pre-crc32c-fix)	32515.79	444.00us	1.41ms
+old-req	32	5	/	volucer worker (pre-crc32c-fix)	33029.85	721.00us	7.97ms
+old-req	8	5	/items	volucer worker (pre-crc32c-fix)	10638.45	706.00us	1.32ms
+old-req	16	5	/items	volucer worker (pre-crc32c-fix)	15287.97	0.91ms	3.69ms
+old-req	32	5	/items	volucer worker (pre-crc32c-fix)	16907.79	1.39ms	17.59ms
 rr	8	5	/	roadrunner worker	20456.89	359.00us	0.96ms
 rr	16	5	/	roadrunner worker	34264.70	425.00us	1.38ms
 rr	32	5	/	roadrunner worker	35963.76	831.00us	2.15ms
 rr	8	5	/items	roadrunner worker	11100.12	653.00us	1.54ms
 rr	16	5	/items	roadrunner worker	17495.20	834.00us	2.12ms
 rr	32	5	/items	roadrunner worker	18122.64	1.67ms	3.19ms
-new-opt	8	6	/	stokehold worker (checksum optional)	24548.21	308.00us	596.00us
-new-opt	16	6	/	stokehold worker (checksum optional)	36744.82	394.00us	1.23ms
-new-opt	32	6	/	stokehold worker (checksum optional)	39159.01	619.00us	6.55ms
-new-opt	8	6	/items	stokehold worker (checksum optional)	12007.79	626.00us	1.21ms
-new-opt	16	6	/items	stokehold worker (checksum optional)	17725.12	793.00us	3.35ms
-new-opt	32	6	/items	stokehold worker (checksum optional)	19932.16	1.17ms	16.32ms
-old-req	8	6	/	stokehold worker (pre-crc32c-fix)	21566.60	353.00us	648.00us
-old-req	16	6	/	stokehold worker (pre-crc32c-fix)	31906.90	452.00us	1.46ms
-old-req	32	6	/	stokehold worker (pre-crc32c-fix)	33484.27	711.00us	8.56ms
-old-req	8	6	/items	stokehold worker (pre-crc32c-fix)	10722.31	702.00us	1.32ms
-old-req	16	6	/items	stokehold worker (pre-crc32c-fix)	15327.16	0.90ms	3.67ms
-old-req	32	6	/items	stokehold worker (pre-crc32c-fix)	17025.71	1.34ms	18.06ms
+new-opt	8	6	/	volucer worker (checksum optional)	24548.21	308.00us	596.00us
+new-opt	16	6	/	volucer worker (checksum optional)	36744.82	394.00us	1.23ms
+new-opt	32	6	/	volucer worker (checksum optional)	39159.01	619.00us	6.55ms
+new-opt	8	6	/items	volucer worker (checksum optional)	12007.79	626.00us	1.21ms
+new-opt	16	6	/items	volucer worker (checksum optional)	17725.12	793.00us	3.35ms
+new-opt	32	6	/items	volucer worker (checksum optional)	19932.16	1.17ms	16.32ms
+old-req	8	6	/	volucer worker (pre-crc32c-fix)	21566.60	353.00us	648.00us
+old-req	16	6	/	volucer worker (pre-crc32c-fix)	31906.90	452.00us	1.46ms
+old-req	32	6	/	volucer worker (pre-crc32c-fix)	33484.27	711.00us	8.56ms
+old-req	8	6	/items	volucer worker (pre-crc32c-fix)	10722.31	702.00us	1.32ms
+old-req	16	6	/items	volucer worker (pre-crc32c-fix)	15327.16	0.90ms	3.67ms
+old-req	32	6	/items	volucer worker (pre-crc32c-fix)	17025.71	1.34ms	18.06ms
 rr	8	6	/	roadrunner worker	20631.24	355.00us	0.94ms
 rr	16	6	/	roadrunner worker	34830.77	417.00us	1.36ms
 rr	32	6	/	roadrunner worker	36371.36	816.00us	2.01ms
 rr	8	6	/items	roadrunner worker	11328.23	640.00us	1.51ms
 rr	16	6	/items	roadrunner worker	17849.33	819.00us	2.12ms
 rr	32	6	/items	roadrunner worker	18102.61	1.66ms	3.28ms
-new-req	8	6	/	stokehold worker (checksum required)	24077.73	314.00us	607.00us
-new-req	16	6	/	stokehold worker (checksum required)	35556.07	407.00us	1.31ms
-new-req	32	6	/	stokehold worker (checksum required)	37891.28	634.00us	7.40ms
-new-req	8	6	/items	stokehold worker (checksum required)	11651.27	643.00us	1.23ms
-new-req	16	6	/items	stokehold worker (checksum required)	16968.25	831.00us	3.15ms
-new-req	32	6	/items	stokehold worker (checksum required)	19164.53	1.20ms	17.63ms
-old-req	8	7	/	stokehold worker (pre-crc32c-fix)	21567.10	353.00us	651.00us
-old-req	16	7	/	stokehold worker (pre-crc32c-fix)	31772.15	452.00us	1.55ms
-old-req	32	7	/	stokehold worker (pre-crc32c-fix)	32847.80	735.00us	7.95ms
-old-req	8	7	/items	stokehold worker (pre-crc32c-fix)	10636.29	703.00us	1.32ms
-old-req	16	7	/items	stokehold worker (pre-crc32c-fix)	15240.91	0.91ms	3.67ms
-old-req	32	7	/items	stokehold worker (pre-crc32c-fix)	16801.46	1.38ms	18.13ms
+new-req	8	6	/	volucer worker (checksum required)	24077.73	314.00us	607.00us
+new-req	16	6	/	volucer worker (checksum required)	35556.07	407.00us	1.31ms
+new-req	32	6	/	volucer worker (checksum required)	37891.28	634.00us	7.40ms
+new-req	8	6	/items	volucer worker (checksum required)	11651.27	643.00us	1.23ms
+new-req	16	6	/items	volucer worker (checksum required)	16968.25	831.00us	3.15ms
+new-req	32	6	/items	volucer worker (checksum required)	19164.53	1.20ms	17.63ms
+old-req	8	7	/	volucer worker (pre-crc32c-fix)	21567.10	353.00us	651.00us
+old-req	16	7	/	volucer worker (pre-crc32c-fix)	31772.15	452.00us	1.55ms
+old-req	32	7	/	volucer worker (pre-crc32c-fix)	32847.80	735.00us	7.95ms
+old-req	8	7	/items	volucer worker (pre-crc32c-fix)	10636.29	703.00us	1.32ms
+old-req	16	7	/items	volucer worker (pre-crc32c-fix)	15240.91	0.91ms	3.67ms
+old-req	32	7	/items	volucer worker (pre-crc32c-fix)	16801.46	1.38ms	18.13ms
 rr	8	7	/	roadrunner worker	20033.34	364.00us	0.95ms
 rr	16	7	/	roadrunner worker	33863.07	426.00us	1.52ms
 rr	32	7	/	roadrunner worker	36119.52	826.00us	2.14ms
 rr	8	7	/items	roadrunner worker	11192.28	650.00us	1.54ms
 rr	16	7	/items	roadrunner worker	17671.57	823.00us	2.15ms
 rr	32	7	/items	roadrunner worker	18061.46	1.67ms	3.32ms
-new-req	8	7	/	stokehold worker (checksum required)	23970.06	315.00us	607.00us
-new-req	16	7	/	stokehold worker (checksum required)	36339.18	398.00us	1.34ms
-new-req	32	7	/	stokehold worker (checksum required)	38214.10	625.00us	8.04ms
-new-req	8	7	/items	stokehold worker (checksum required)	11841.24	635.00us	1.23ms
-new-req	16	7	/items	stokehold worker (checksum required)	17453.08	804.00us	3.25ms
-new-req	32	7	/items	stokehold worker (checksum required)	19386.11	1.23ms	15.91ms
-new-opt	8	7	/	stokehold worker (checksum optional)	24458.91	309.00us	596.00us
-new-opt	16	7	/	stokehold worker (checksum optional)	36876.59	391.00us	1.28ms
-new-opt	32	7	/	stokehold worker (checksum optional)	38657.44	622.00us	7.46ms
-new-opt	8	7	/items	stokehold worker (checksum optional)	11964.36	627.00us	1.23ms
-new-opt	16	7	/items	stokehold worker (checksum optional)	17615.60	804.00us	3.13ms
-new-opt	32	7	/items	stokehold worker (checksum optional)	19309.30	1.20ms	16.83ms
+new-req	8	7	/	volucer worker (checksum required)	23970.06	315.00us	607.00us
+new-req	16	7	/	volucer worker (checksum required)	36339.18	398.00us	1.34ms
+new-req	32	7	/	volucer worker (checksum required)	38214.10	625.00us	8.04ms
+new-req	8	7	/items	volucer worker (checksum required)	11841.24	635.00us	1.23ms
+new-req	16	7	/items	volucer worker (checksum required)	17453.08	804.00us	3.25ms
+new-req	32	7	/items	volucer worker (checksum required)	19386.11	1.23ms	15.91ms
+new-opt	8	7	/	volucer worker (checksum optional)	24458.91	309.00us	596.00us
+new-opt	16	7	/	volucer worker (checksum optional)	36876.59	391.00us	1.28ms
+new-opt	32	7	/	volucer worker (checksum optional)	38657.44	622.00us	7.46ms
+new-opt	8	7	/items	volucer worker (checksum optional)	11964.36	627.00us	1.23ms
+new-opt	16	7	/items	volucer worker (checksum optional)	17615.60	804.00us	3.13ms
+new-opt	32	7	/items	volucer worker (checksum optional)	19309.30	1.20ms	16.83ms

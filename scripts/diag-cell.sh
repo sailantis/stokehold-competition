@@ -16,7 +16,7 @@
 # cumulative since process start.
 #
 # Why this exists rather than a flag on an existing script: `diag-checksum.sh` compares
-# three *stokehold* builds and has no RoadRunner path, and `diag-split.sh` measures one
+# three *volucer* builds and has no RoadRunner path, and `diag-split.sh` measures one
 # arm at a time in a block. Explaining a crossover needs both servers in the same window
 # and the same round structure as the measurement that found it.
 #
@@ -26,9 +26,9 @@
 #   VARIANTS=new-req,new-opt,rr bash diag-cell.sh
 #
 # Environment:
-#   BIN        stokehold release binary   (default ~/stoke-bench/target/release/stokehold)
+#   BIN        volucer release binary   (default ~/volucer-bench/target/release/volucer)
 #   ROOT       this checkout              (default the script's parent directory)
-#   RUNDIR     rows land here             (default ~/stoke-bench-run-cell)
+#   RUNDIR     rows land here             (default ~/volucer-bench-run-cell)
 #   RR         RoadRunner binary          (default ~/bin/rr)
 set -uo pipefail
 
@@ -42,8 +42,8 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(dirname "$SCRIPT_DIR")}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-cell}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run-cell}"
 RR="${RR:-$HOME/bin/rr}"
 VARIANTS="${VARIANTS:-new-req,rr}"
 CONC="${CONC:-16}"
@@ -63,7 +63,7 @@ fail() {
     exit 1
 }
 
-[ -x "$BIN" ] || fail "no stokehold binary at $BIN"
+[ -x "$BIN" ] || fail "no volucer binary at $BIN"
 [ -f "$ROOT/composer.json" ] || fail "no checkout at $ROOT"
 [ -n "$PHP" ] || fail "no php on PATH"
 command -v wrk >/dev/null 2>&1 || fail "no wrk on PATH"
@@ -284,10 +284,10 @@ for round in $(seq 1 "$ROUNDS"); do
             snapshot_comm "$DIR/after.txt" >"$DIR/a.txt"
             by_comm="$(cpu_by_comm "$DIR/b.txt" "$DIR/a.txt" "$wall")"
 
-            # The server process is `stokehold` for one variant and `rr` for the other, and
+            # The server process is `volucer` for one variant and `rr` for the other, and
             # php is the pool on both sides. Naming them separately keeps the two halves
             # apart, which is the whole point of attributing rather than totalling.
-            srv="$(awk '$1=="stokehold"||$1=="rr"{s+=$2} END{print s+0}' <<<"$by_comm")"
+            srv="$(awk '$1=="volucer"||$1=="rr"{s+=$2} END{print s+0}' <<<"$by_comm")"
             phpc="$(awk '$1=="php"{s+=$2} END{print s+0}' <<<"$by_comm")"
             tot="$(awk '{s+=$2} END{print s+0}' <<<"$by_comm")"
 

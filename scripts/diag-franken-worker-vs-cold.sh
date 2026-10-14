@@ -14,7 +14,7 @@
 # ONLY in whether the worker is matched to every path.
 set -uo pipefail
 FP=/home/competition/bin/frankenphp
-ROOT=/home/competition/workspace/stokehold-competition
+ROOT=/home/competition/workspace/volucer-competition
 RUNDIR=/home/competition/fp-worker-vs-cold
 PORT=18992
 rm -rf "$RUNDIR"; mkdir -p "$RUNDIR"

@@ -2,7 +2,7 @@
 # Why does the embedded runtime stop scaling?
 #
 # The interleaved run leaves a specific shape: FrankenPHP is the fastest arm at
-# concurrency 1 and then flattens, while stokehold roughly doubles from 8 to 32. Two
+# concurrency 1 and then flattens, while volucer roughly doubles from 8 to 32. Two
 # very different explanations, and they lead to opposite conclusions:
 #
 #   (a) CPU-BOUND. The embedded runtime burns all twelve cores and 16k rps is simply
@@ -29,11 +29,11 @@
 # Usage: bash diag-franken-cpu.sh
 set -uo pipefail
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-ab}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run-ab}"
 FP="${FP:-$HOME/bin/frankenphp}"
 RR="${RR:-$HOME/bin/rr}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 WORKERS="${WORKERS:-12}"
 CONC="${CONC:-16}"
 # Seconds, as a plain integer: this value is used in arithmetic and in `sleep`, and a
@@ -182,4 +182,4 @@ echo "  server %   = share of all $CORES cores consumed by the server's process 
 echo "  cores used = server CPU-seconds per wall-second (a CPU-bound server reaches $CORES)"
 echo
 echo "=== strays ==="
-ps -eww -o args | grep -E '[f]rankenphp run|[r]r serve|stokehold serve' | head
+ps -eww -o args | grep -E '[f]rankenphp run|[r]r serve|volucer serve' | head

@@ -17,21 +17,21 @@
 # spread of those ratios across rounds is the error bar.
 #
 #   variant    what it is
-#   new-req    current stokehold, checksum = "required"   (what the sweep measured)
-#   new-opt    current stokehold, checksum = "optional"   (does skipping it help?)
-#   old-req    pre-crc32c-fix stokehold, checksum = "required"  (what the fix bought)
+#   new-req    current volucer, checksum = "required"   (what the sweep measured)
+#   new-opt    current volucer, checksum = "optional"   (does skipping it help?)
+#   old-req    pre-crc32c-fix volucer, checksum = "required"  (what the fix bought)
 #   rr         RoadRunner, resident worker                 (the control)
 #   franken    FrankenPHP, worker mode                     (embedded-runtime control)
 #
 # `rr` is the control and the reason this is an A/B and not a trend: it shares no
-# code with any other variant, so a round in which every stokehold variant moved
-# but `rr` did not is a round in which stokehold moved, and a round in which both
+# code with any other variant, so a round in which every volucer variant moved
+# but `rr` did not is a round in which volucer moved, and a round in which both
 # moved together is the host.
 #
 # `franken` is a second control of a different kind, and it earns its place by being
 # the one arm that answers an architectural question rather than a tuning one.
 # FrankenPHP embeds the PHP interpreter inside its own process — a Caddy server with
-# a ZTS PHP built into the binary — which is exactly what stokehold rejects on
+# a ZTS PHP built into the binary — which is exactly what volucer rejects on
 # purpose (no embedding, no FFI, PHP is always an external process; see the plan's
 # constraints). Every other variant here spawns PHP; this one IS PHP. It runs
 # `frankenphp-worker.php`, which drives the same `BenchApp` as `worker.php` and
@@ -50,7 +50,7 @@
 # on) while every other arm ran 512M and off.
 #
 # The `old-req` variant is a targeted revert rather than an old checkout: the
-# crate-backed `crc32c` in `stokehold-worker/src/header.rs` is replaced with the
+# crate-backed `crc32c` in `volucer-worker/src/header.rs` is replaced with the
 # hand-written bit-by-bit loop it replaced, so the only difference from `new-req`
 # is that one function on the response path. See the header of the report's
 # revision note for how the binary is built. It is behaviourally identical — both
@@ -64,10 +64,10 @@
 #   ENDPOINTS=/items bash ab-perf.sh
 #
 # Environment:
-#   BIN       current stokehold release   (default ~/stoke-bench/target/release/stokehold)
-#   BIN_OLD   pre-crc32c-fix release      (default ~/stoke-bench-nocrc/target/release/stokehold)
+#   BIN       current volucer release   (default ~/volucer-bench/target/release/volucer)
+#   BIN_OLD   pre-crc32c-fix release      (default ~/volucer-bench-nocrc/target/release/volucer)
 #   ROOT      this checkout               (default the script's parent directory)
-#   RUNDIR    scratch + results           (default ~/stoke-bench-run-ab)
+#   RUNDIR    scratch + results           (default ~/volucer-bench-run-ab)
 #   RR        RoadRunner binary           (default ~/bin/rr)
 #   FP        FrankenPHP binary           (default ~/bin/frankenphp)
 #
@@ -87,9 +87,9 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(dirname "$SCRIPT_DIR")}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
-BIN_OLD="${BIN_OLD:-$HOME/stoke-bench-nocrc/target/release/stokehold}"
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-ab}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
+BIN_OLD="${BIN_OLD:-$HOME/volucer-bench-nocrc/target/release/volucer}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run-ab}"
 RR="${RR:-$HOME/bin/rr}"
 FP="${FP:-$HOME/bin/frankenphp}"
 VARIANTS="${VARIANTS:-new-req,new-opt,old-req,rr,franken}"
@@ -113,7 +113,7 @@ fail() {
     exit 1
 }
 
-[ -x "$BIN" ] || fail "no stokehold binary at $BIN (set BIN)"
+[ -x "$BIN" ] || fail "no volucer binary at $BIN (set BIN)"
 [ -f "$ROOT/composer.json" ] || fail "no checkout at $ROOT (set ROOT)"
 [ -d "$ROOT/vendor" ] || fail "$ROOT/vendor is missing - run: composer install"
 [ -f "$ROOT/data/bench.sqlite" ] || fail "$ROOT/data/bench.sqlite is missing - run: php seed.php"
@@ -157,7 +157,7 @@ binary_of() {
 }
 
 # `required` is the default and what every published number used; spelling it out
-# keeps the three stokehold rows visually comparable in the generated config.
+# keeps the three volucer rows visually comparable in the generated config.
 checksum_of() {
     case "$1" in
         *-opt) echo "optional" ;;
@@ -329,7 +329,7 @@ check_ports_free() {
         echo "FATAL: something is already answering on a port this run needs, so it"
         echo "       would be measured in place of the variant named:$busy"
         echo "       See what owns it:  ss -ltnp"
-        echo "       Or kill every bench server:  pkill -f stoke-bench-run-ab"
+        echo "       Or kill every bench server:  pkill -f volucer-bench-run-ab"
         exit 1
     fi
 }
@@ -454,9 +454,9 @@ run_cell() {
 
 label_of() {
     case "$1" in
-        new-req) echo "stokehold worker (checksum required)" ;;
-        new-opt) echo "stokehold worker (checksum optional)" ;;
-        old-req) echo "stokehold worker (pre-crc32c-fix)" ;;
+        new-req) echo "volucer worker (checksum required)" ;;
+        new-opt) echo "volucer worker (checksum optional)" ;;
+        old-req) echo "volucer worker (pre-crc32c-fix)" ;;
         rr) echo "roadrunner worker" ;;
         franken) echo "frankenphp worker (embedded php)" ;;
         *) echo "$1" ;;
@@ -471,7 +471,7 @@ echo " interleaved A/B: is the warm arm's lead still there?"
 echo "=============================================================="
 echo "  host:        $(nproc) cores, $(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo) MB"
 echo "  php:         $(php -v | head -1)"
-echo "  stokehold:   $($BIN version 2>/dev/null | head -1)"
+echo "  volucer:   $($BIN version 2>/dev/null | head -1)"
 echo "  new  binary: $(md5sum "$BIN" | cut -d' ' -f1)"
 for v in ${VARIANTS//,/ }; do
     [ "$v" = "old-req" ] || [ "$v" = "old-opt" ] || continue

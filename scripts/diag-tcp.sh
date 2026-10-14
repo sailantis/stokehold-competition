@@ -22,8 +22,8 @@ set -u
 ITERS="${1:-2000}"
 RUNS="${2:-5}"
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 DIR="$(mktemp -d /tmp/diag-tcp.XXXXXX)"
 PHP_CGI="$(command -v php-cgi)"
 PORT_T=19500

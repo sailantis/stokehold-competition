@@ -1,9 +1,9 @@
 #!/bin/bash
 # Five ways to serve one page, on one machine, measured the same way.
 #
-#   P  stokehold + resident worker     warm framework, pipe
-#   T  stokehold + spawn_cgi (TCP)     cold framework, loopback TCP
-#   U  stokehold + spawn_cgi (unix)    cold framework, unix socket
+#   P  volucer + resident worker     warm framework, pipe
+#   T  volucer + spawn_cgi (TCP)     cold framework, loopback TCP
+#   U  volucer + spawn_cgi (unix)    cold framework, unix socket
 #   R  RoadRunner + resident worker    warm framework, pipe
 #   F  nginx + php-fpm                 cold framework, unix socket
 #
@@ -17,7 +17,7 @@
 # One confound is stated rather than hidden: P is both warm AND piped, so P-vs-T/U
 # mixes model with transport. The transport question is answered by T vs U, where
 # the model is held equal, and the model question by P vs T/U, which is what the
-# repository exists to ask. Hazard 23 in the stokehold plan already measured pipe
+# repository exists to ask. Hazard 23 in the volucer plan already measured pipe
 # and TCP as identical to concurrency 8 on a trivial handler.
 #
 # Usage:
@@ -27,9 +27,9 @@
 #   ENDPOINTS=/items bash bench.sh         # the ORM page only
 #
 # Environment:
-#   BIN          stokehold release binary      (default ~/stoke-bench/target/release/stokehold)
+#   BIN          volucer release binary      (default ~/volucer-bench/target/release/volucer)
 #   ROOT         this checkout                 (default the script's parent directory)
-#   RUNDIR       scratch + results             (default ~/stoke-bench-run)
+#   RUNDIR       scratch + results             (default ~/volucer-bench-run)
 #   RR           RoadRunner binary             (default ~/bin/rr)
 set -uo pipefail
 
@@ -37,8 +37,8 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(dirname "$SCRIPT_DIR")}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run}"
 RR="${RR:-$HOME/bin/rr}"
 ARMS="${ARMS:-P,T,U,R,F}"
 CONC="${CONC:-1,4,8,16,32}"
@@ -86,8 +86,8 @@ chmod 0777 "$SOCKET_DIR"
 BASE_PORT="${BASE_PORT:-18400}"
 CGI_TCP_BASE="${CGI_TCP_BASE:-19300}"
 FPM_SOCKET="$SOCKET_DIR/fpm.sock"
-FPM_POOL_CONF="/etc/php/8.3/fpm/pool.d/bench-stokehold.conf"
-NGINX_CONF="/etc/nginx/conf.d/bench-stokehold.conf"
+FPM_POOL_CONF="/etc/php/8.3/fpm/pool.d/bench-volucer.conf"
+NGINX_CONF="/etc/nginx/conf.d/bench-volucer.conf"
 RESULTS="$RUNDIR/results.tsv"
 LATENCY_RESULTS="$RUNDIR/latency.tsv"
 CROSSOVER_RESULTS="$RUNDIR/crossover.tsv"
@@ -97,7 +97,7 @@ fail() {
     exit 1
 }
 
-[ -x "$BIN" ] || fail "no stokehold binary at $BIN (build it, or set BIN)"
+[ -x "$BIN" ] || fail "no volucer binary at $BIN (build it, or set BIN)"
 [ -f "$ROOT/composer.json" ] || fail "no checkout at $ROOT (set ROOT)"
 [ -d "$ROOT/vendor" ] || fail "$ROOT/vendor is missing - run: composer install"
 [ -f "$ROOT/data/bench.sqlite" ] || fail "$ROOT/data/bench.sqlite is missing - run: php seed.php"
@@ -119,7 +119,7 @@ fail() {
 # with nothing to do with the server. The wrapper gives php-cgi the settings the
 # FPM pool uses, so T/U-vs-F is a difference of server, not of ini.
 #
-# It is a shell script rather than a `-d` list because stokehold runs the
+# It is a shell script rather than a `-d` list because volucer runs the
 # configured command through its own tokenizer, not through a shell.
 # ---------------------------------------------------------------------------
 PHP_CGI_WRAPPER="$RUNDIR/php-cgi-bench"
@@ -185,10 +185,10 @@ stamp() {
         "$@" "$template" > "$output"
 }
 
-# --- stamp the stokehold + RoadRunner configs ------------------------------
-stamp "$ROOT/conf/stoke-pipe.toml.template"     "$RUNDIR/stoke-pipe.toml"     -e "s#{{PORT}}#$((BASE_PORT + 0))#g"
-stamp "$ROOT/conf/stoke-cgi-tcp.toml.template"  "$RUNDIR/stoke-cgi-tcp.toml"  -e "s#{{PORT}}#$((BASE_PORT + 1))#g" -e "s#{{BASE_PORT}}#$CGI_TCP_BASE#g"
-stamp "$ROOT/conf/stoke-cgi-unix.toml.template" "$RUNDIR/stoke-cgi-unix.toml" -e "s#{{PORT}}#$((BASE_PORT + 2))#g"
+# --- stamp the volucer + RoadRunner configs ------------------------------
+stamp "$ROOT/conf/volucer-pipe.toml.template"     "$RUNDIR/volucer-pipe.toml"     -e "s#{{PORT}}#$((BASE_PORT + 0))#g"
+stamp "$ROOT/conf/volucer-cgi-tcp.toml.template"  "$RUNDIR/volucer-cgi-tcp.toml"  -e "s#{{PORT}}#$((BASE_PORT + 1))#g" -e "s#{{BASE_PORT}}#$CGI_TCP_BASE#g"
+stamp "$ROOT/conf/volucer-cgi-unix.toml.template" "$RUNDIR/volucer-cgi-unix.toml" -e "s#{{PORT}}#$((BASE_PORT + 2))#g"
 stamp "$ROOT/conf/roadrunner.yaml.template"     "$RUNDIR/rr.yaml"             -e "s#{{PORT}}#$((BASE_PORT + 3))#g"
 
 ARM_PORT_P=$((BASE_PORT + 0))
@@ -454,7 +454,7 @@ run_crossover() {
     done
 }
 
-start_stokehold() {
+start_volucer() {
     "$BIN" serve -c "$1" >"$RUNDIR/server-$2.log" 2>&1 &
     PID=$!
 }
@@ -602,7 +602,7 @@ echo "=============================================================="
 echo "  host:        $(nproc) cores, $(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo) MB"
 echo "  php:         $(php -v | head -1)"
 echo "  php-cgi:     $PHP_CGI"
-echo "  stokehold:   $($BIN version 2>/dev/null | head -1)"
+echo "  volucer:   $($BIN version 2>/dev/null | head -1)"
 echo "  app:         $ROOT"
 echo "  arms:        $ARMS"
 echo "  endpoints:   $ENDPOINTS"
@@ -639,37 +639,37 @@ for arm in ${ARMS//,/ }; do
     echo "--------------------------------------------------------------"
     case "$arm" in
         P)
-            echo "ARM P: stokehold + resident worker (warm, pipe)"
-            start_stokehold "$RUNDIR/stoke-pipe.toml" pipe-p
+            echo "ARM P: volucer + resident worker (warm, pipe)"
+            start_volucer "$RUNDIR/volucer-pipe.toml" pipe-p
             if wait_port "$ARM_PORT_P" && sanity "$ARM_PORT_P" P; then
-                run_client "$ARM_PORT_P" "P stokehold+worker(pipe)" P
-                run_latency "$ARM_PORT_P" "P stokehold+worker(pipe)" P
-                run_crossover "$ARM_PORT_P" "P stokehold+worker(pipe)" P
+                run_client "$ARM_PORT_P" "P volucer+worker(pipe)" P
+                run_latency "$ARM_PORT_P" "P volucer+worker(pipe)" P
+                run_crossover "$ARM_PORT_P" "P volucer+worker(pipe)" P
             else
                 echo "  ARM P not measured:"; tail -5 "$RUNDIR/server-pipe-p.log" 2>/dev/null
             fi
             stop_arm; sleep 1
             ;;
         T)
-            echo "ARM T: stokehold + spawn_cgi (cold, loopback TCP)"
-            start_stokehold "$RUNDIR/stoke-cgi-tcp.toml" cgi-t
+            echo "ARM T: volucer + spawn_cgi (cold, loopback TCP)"
+            start_volucer "$RUNDIR/volucer-cgi-tcp.toml" cgi-t
             if wait_port "$ARM_PORT_T" && sanity "$ARM_PORT_T" T; then
-                run_client "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
-                run_latency "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
-                run_crossover "$ARM_PORT_T" "T stokehold+spawn_cgi(tcp)" T
+                run_client "$ARM_PORT_T" "T volucer+spawn_cgi(tcp)" T
+                run_latency "$ARM_PORT_T" "T volucer+spawn_cgi(tcp)" T
+                run_crossover "$ARM_PORT_T" "T volucer+spawn_cgi(tcp)" T
             else
                 echo "  ARM T not measured:"; tail -5 "$RUNDIR/server-cgi-t.log" 2>/dev/null
             fi
             stop_arm; sleep 1
             ;;
         U)
-            echo "ARM U: stokehold + spawn_cgi (cold, unix socket)"
+            echo "ARM U: volucer + spawn_cgi (cold, unix socket)"
             if [ "$(uname -s)" = "Darwin" ] || [ "$(uname -s)" = "Linux" ]; then
-                start_stokehold "$RUNDIR/stoke-cgi-unix.toml" cgi-u
+                start_volucer "$RUNDIR/volucer-cgi-unix.toml" cgi-u
                 if wait_port "$ARM_PORT_U" && sanity "$ARM_PORT_U" U; then
-                    run_client "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
-                    run_latency "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
-                    run_crossover "$ARM_PORT_U" "U stokehold+spawn_cgi(unix)" U
+                    run_client "$ARM_PORT_U" "U volucer+spawn_cgi(unix)" U
+                    run_latency "$ARM_PORT_U" "U volucer+spawn_cgi(unix)" U
+                    run_crossover "$ARM_PORT_U" "U volucer+spawn_cgi(unix)" U
                 else
                     echo "  ARM U not measured:"; tail -5 "$RUNDIR/server-cgi-u.log" 2>/dev/null
                 fi

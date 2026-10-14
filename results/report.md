@@ -1,7 +1,7 @@
 # Five ways to serve one page — 12 cores, one host
 
 **Host:** Xeon Gold 5412U, 12 cores, 3884 MB, Ubuntu, PHP 8.3.35 NTS, nginx 1.24.0,
-RoadRunner 2025.1.15, stokehold `91cc7b6`, wrk 4.1.0.
+RoadRunner 2025.1.15, volucer `91cc7b6`, wrk 4.1.0.
 **Method:** `scripts/bench.sh`, 5 s per cell, 3 repeats, median reported, 12 workers/slots
 in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus four extra passes:
 `scripts/latency.php` (the sequential per-request methodology the published figures used),
@@ -10,7 +10,7 @@ in every arm, endpoints `GET /` and `GET /items`, no failed cells. Plus four ext
 arm's process tree), and `scripts/ab-perf.sh` (four builds measured in rotating order inside one
 round, which the blocked sweep above cannot do).
 
-> **This revision (stokehold `91cc7b6`) re-measures all five arms on the current `main`.**
+> **This revision (volucer `91cc7b6`) re-measures all five arms on the current `main`.**
 > The previous tables were taken at `ddaada7`, whose four code commits were the FastCGI
 > response-assembly fix, the worker request path, the reply-frame buffer, and the optional
 > checksum. Five commits have landed since — the Windows/loopback transport work and a pure
@@ -23,7 +23,7 @@ round, which the blocked sweep above cannot do).
 > note missed: every arm fell *except* the two arms the four commits touched (P +0.35%,
 > R −2.79%, F −1.63%, T −1.54%, U −1.77% — RoadRunner slower in 10 of 10 cells). The
 > absolute rps column is not comparable between sweeps; the ratios are, and by those the
-> four commits *improved* stokehold's lead (P/R +5.3% on `/`).
+> four commits *improved* volucer's lead (P/R +5.3% on `/`).
 >
 > **And the leak guard that sweep relied on could not see the arms it guarded.** It matched
 > the literal string `php-cgi -b`, but arms T and U spawn PHP through a wrapper whose argv
@@ -46,7 +46,7 @@ round, which the blocked sweep above cannot do).
 >
 > Median **−0.00%**, 5 of 10 cells each way, every delta inside the 3.3% within-cell repeat
 > spread. So the refactor is free, and the ~3.3% on P in the table below is drift that
-> happened to land on this run rather than on stokehold.
+> happened to land on this run rather than on volucer.
 >
 > The per-arm medians below come from the comparison, not from this note: **P −3.3%**,
 > **R −1.5%**, **F −0.9%**, **T −0.6%**, **U −2.0%**. Read the ratios, not the deltas.
@@ -69,12 +69,12 @@ round, which the blocked sweep above cannot do).
 > RoadRunner in every cell of every round**. CPU attribution agrees to the microsecond: the
 > fix removes **59 µs of server CPU per request** (184 → 125 µs on `/items` at c=32, −32%) and
 > leaves the PHP column where it was. See "Is the warm arm's lead still there?" below, and
-> hazards 50–51 in the stokehold plan. The two CPU-attribution tables *below* are still the
+> hazards 50–51 in the volucer plan. The two CPU-attribution tables *below* are still the
 > carried-over ones, but this revision adds a current attribution for exactly the three builds
 > the question is about.
 
-> **The previous revision (stokehold `841c963`) refreshed the five measured tables after the
-> transport-buffering pass** — every read and write path in stokehold's three transports now
+> **The previous revision (volucer `841c963`) refreshed the five measured tables after the
+> transport-buffering pass** — every read and write path in volucer's three transports now
 > enters the kernel once per frame instead of once per frame *field*. It changes throughput by
 > a few percent, not by a factor; the A/B against the previous build is at the foot of the
 > transport section. The two CPU-attribution tables ("Where the warm arm's 10% went", "The
@@ -93,7 +93,7 @@ round, which the blocked sweep above cannot do).
 >
 > **A fourth pass was added after the first three disagreed with themselves.** A 10%
 > deficit against RoadRunner on *every* endpoint, in two implementations of the same
-> design, is small enough to be a property of stokehold's code rather than of the model —
+> design, is small enough to be a property of volucer's code rather than of the model —
 > and it was. CPU attribution found it in an hour, where wall clock had not found it in
 > three passes; see "Where the warm arm's 10% went". Every number in this report below is
 > from the fixed build.
@@ -122,9 +122,9 @@ round, which the blocked sweep above cannot do).
 | Does it show in aggregate throughput? | **yes on `/`, ~2.0x; and 2.24x on `/items` at c=32** (originally ~1.0x, which was a bug) | wrk, 12 slots |
 | At what load does it stop paying? | **it does not, within 1..16** - flat ~2.0x | crossover |
 | Why does the cold model idle 16% of the cores? | **it costs 1,063 us of CPU per request against 666** - a duty cycle, not headroom | CPU accounting |
-| Is loopback TCP a problem? | **no - T and U agree to 3%** (a 40 ms/request stall in stokehold's client was) | latency + wire |
+| Is loopback TCP a problem? | **no - T and U agree to 3%** (a 40 ms/request stall in volucer's client was) | latency + wire |
 | Which transport should I use? | **either** - keep `unix:` for permissions, not speed | both |
-| Does stokehold agree with RoadRunner? | **it leads by 1-5% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
+| Does volucer agree with RoadRunner? | **it leads by 1-5% at c=32**, warm vs warm, with a cheaper front-end (136 us vs 155) | both |
 | What was the syscall-buffering pass worth? | **2-6% on `/`, nothing on `/items`** - a fixed cost removed, not a proportional one | A/B, two binaries |
 | Did the `worker_pool.rs` split cost anything? | **no - −0.00% median**, every cell inside the repeat spread | A/B, `A,B,B,A`, two binaries |
 | Is the crc32c fix still worth what it claimed? | **it is worth more, and it is the whole lead** - +10.2% to +16.3% over the reverted build, which is 5.8-12.9% *behind* RoadRunner | interleaved A/B, 168 cells |
@@ -138,17 +138,17 @@ Everything below is the detail behind that table.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 3,268 | 12,970 | 23,278 | 34,394 | 36,008 |
+| **P** | volucer | warm worker, pipe | 3,268 | 12,970 | 23,278 | 34,394 | 36,008 |
 | **R** | RoadRunner | warm worker, pipe | 2,999 | 11,143 | 19,730 | 33,462 | 35,513 |
 | **F** | nginx + php-fpm | cold, unix socket | 1,823 | 6,504 | 11,638 | 18,365 | 17,960 |
-| **U** | stokehold | cold, unix socket | 1,571 | 5,631 | 9,419 | 14,397 | 16,126 |
-| **T** | stokehold | cold, loopback TCP | 1,534 | 5,866 | 9,736 | 14,212 | 16,744 |
+| **U** | volucer | cold, unix socket | 1,571 | 5,631 | 9,419 | 14,397 | 16,126 |
+| **T** | volucer | cold, loopback TCP | 1,534 | 5,866 | 9,736 | 14,212 | 16,744 |
 
 Ratios at c=32: **P/F 2.00×**, **R/F 1.98×**, **T/U 1.04×**.
 
 Two things follow. The piped warm worker (P) and RoadRunner (R) agree to within ~5% at
 c=32 (36,008 against 35,512, **1.01×**), which is what makes the warm half of the
-comparison credible — two independent servers, one model — and stokehold is the marginally
+comparison credible — two independent servers, one model — and volucer is the marginally
 faster of the two at every concurrency up to 16. And on this endpoint **transport is
 irrelevant**: 1.04× T/U, and T and U are themselves within 4%. The piped worker's advantage
 comes from not booting the framework, not from the pipe.
@@ -157,11 +157,11 @@ comes from not booting the framework, not from the pipe.
 
 | arm | server | model | c=1 | c=4 | c=8 | c=16 | c=32 |
 |---|---|---|---|---|---|---|---|
-| **P** | stokehold | warm worker, pipe | 1,790 | 6,893 | 11,523 | 16,696 | 18,655 |
+| **P** | volucer | warm worker, pipe | 1,790 | 6,893 | 11,523 | 16,696 | 18,655 |
 | **R** | RoadRunner | warm worker, pipe | 1,727 | 6,535 | 10,957 | 17,190 | 17,804 |
 | **F** | nginx + php-fpm | cold, unix socket | 808 | 3,049 | 5,430 | 8,412 | 8,325 |
-| **U** | stokehold | cold, unix socket | 654 | 2,696 | 4,616 | 7,240 | 8,179 |
-| **T** | stokehold | cold, loopback TCP | 651 | 2,838 | 4,736 | 7,015 | 8,014 |
+| **U** | volucer | cold, unix socket | 654 | 2,696 | 4,616 | 7,240 | 8,179 |
+| **T** | volucer | cold, loopback TCP | 651 | 2,838 | 4,736 | 7,015 | 8,014 |
 
 Ratios at c=32: **P/F 2.24×**, **R/F 2.14×**, **T/U 0.98×**.
 
@@ -175,7 +175,7 @@ with every arm given the same PHP they roughly doubled and the cold arms did not
 
 The T column in the *first* version of this file read **198–281 rps** on `/items` and was
 called a measurement artifact of the single-connection sweep. It was not an artifact: T was
-stalling 40 ms per request in stokehold's client, which is now fixed, and T now sits within
+stalling 40 ms per request in volucer's client, which is now fixed, and T now sits within
 2% of U at every concurrency.
 
 ## What this says about the deployment model
@@ -188,11 +188,11 @@ iterations × 10 runs. Median of the run medians, milliseconds:
 
 | arm | `GET /` | `GET /items` | vs the warm arms |
 |---|---|---|---|
-| **P** stokehold worker (warm) | 0.356 | **0.585** | 1.00× |
+| **P** volucer worker (warm) | 0.356 | **0.585** | 1.00× |
 | **R** RoadRunner (warm) | 0.386 | **0.633** | 1.00× |
 | **F** nginx + php-fpm (cold) | 0.592 | 1.242 | 1.66× / **2.12×** |
-| **U** stokehold cold, unix (cold) | 0.701 | 1.521 | 1.97× / **2.60×** |
-| **T** stokehold cold, TCP (cold) | 0.713 | 1.505 | 2.00× / **2.57×** |
+| **U** volucer cold, unix (cold) | 0.701 | 1.521 | 1.97× / **2.60×** |
+| **T** volucer cold, TCP (cold) | 0.713 | 1.505 | 2.00× / **2.57×** |
 
 Against `azera-competition`'s published `GET /items` for the same application
 (RoadRunner 0.4647 ms, php-fpm 1.5318 ms = 3.30×) this run gives **2.12×**, and on `GET /`
@@ -201,14 +201,14 @@ and reproduces about two-thirds of its magnitude on this host.
 
 **T and U agree to about 2%** (0.701 vs 0.713; 1.521 vs 1.505), which is inside the 4–8%
 run-to-run spread each arm shows across its ten runs. They did not agree at all before: T
-was 1.656 ms against U's 1.466 ms because of a 40 ms-per-request stall in stokehold's own
+was 1.656 ms against U's 1.466 ms because of a 40 ms-per-request stall in volucer's own
 client, not because of the transport. See "What this says about the transport" — that was
 the single largest correction in this report's history, and it moved T by 34×.
 
 > The warm arms read ~5–7% slower here than at `ddaada7` (P 0.332 → 0.356 ms, R 0.367 →
 > 0.386) while the cold arms barely moved (F +2%, U −1%, T +3%). Both warm arms moving
 > together, including the one this repository does not build, is the signature of a run
-> effect rather than of stokehold — and the `A,B,B,A` binary comparison above measures the
+> effect rather than of volucer — and the `A,B,B,A` binary comparison above measures the
 > only candidate code change at −0.00%. This pass is 1,000 sequential requests per arm, so
 > it is the most exposed of the three to a host that is not perfectly quiet.
 
@@ -266,11 +266,11 @@ At concurrency 32 on `/items`, before the fix:
 
 | arm | rps | server CPU/req | PHP CPU/req | total |
 |---|---|---|---|---|
-| **P** stokehold | 16,017 | **413 µs** | 608 µs | 1,021 µs |
+| **P** volucer | 16,017 | **413 µs** | 608 µs | 1,021 µs |
 | **R** RoadRunner | 17,860 | **309 µs** | 704 µs | 1,013 µs |
 
 The totals agree to **1%** while the two server halves differ by **1.34×**. The gap was
-entirely stokehold's front-end — not the worker protocol, not the pipe, not PHP, not the
+entirely volucer's front-end — not the worker protocol, not the pipe, not PHP, not the
 client. (The PHP columns differ too, but in the other direction and by less; PHP runs the
 same application on both, so that half is noise between runs.)
 
@@ -279,9 +279,9 @@ process during a saturated run:
 
 | symbol | self time |
 |---|---|
-| `stokehold_worker::codec::Channel::read_frame` (with `crc32c` inlined) | **14.8–19.0%** |
-| `stokehold_fcgi::client::parse_response_headers` | 5.2% |
-| `stokehold_fcgi::client::split_response_body` | 5.2% |
+| `volucer_worker::codec::Channel::read_frame` (with `crc32c` inlined) | **14.8–19.0%** |
+| `volucer_fcgi::client::parse_response_headers` | 5.2% |
+| `volucer_fcgi::client::split_response_body` | 5.2% |
 
 All three were a full pass over the response body, per request, in userspace:
 
@@ -305,11 +305,11 @@ And after, measured the same way on the same host:
 
 | arm, conc 32, `/items` | rps | server CPU/req | vs RoadRunner |
 |---|---|---|---|
-| **P** stokehold | **18,946** | **137 µs** | 0.89× |
+| **P** volucer | **18,946** | **137 µs** | 0.89× |
 | **R** RoadRunner | 18,019 | 153 µs | 1.00× |
 
-**stokehold's front-end is now cheaper than RoadRunner's as well as faster end to end.**
-`perf` no longer lists any stokehold function above 1.3%.
+**volucer's front-end is now cheaper than RoadRunner's as well as faster end to end.**
+`perf` no longer lists any volucer function above 1.3%.
 
 Two things generalise beyond this fix:
 
@@ -337,7 +337,7 @@ aggregate rate were unaffected. A second version put the penalty at ~10% (13% on
 cost, which `ss` does show — `minrtt` 11 µs against 2 µs.
 
 Both were measuring a real effect and misnaming its owner. `spawn_cgi` over TCP was
-**stalling 40 ms per request** in stokehold's own client, and the mechanism is:
+**stalling 40 ms per request** in volucer's own client, and the mechanism is:
 
 - A Linux `php-cgi` child **never sets `TCP_NODELAY`**. `main/fastcgi.c` guards that call
   with `req->keep && req->tcp`, and `req->tcp` is assigned only under `#ifdef _WIN32`
@@ -361,20 +361,20 @@ Measured on one slot, sequential, `/items`:
 
 42.005 ms with a 0.05 ms spread is a timer, not a rate: 40 ms of delayed ACK plus ~2 ms of
 work. The wire trace agreed, showing php-cgi's trailing 1728-byte segment leaving **10 µs
-after** stokehold's ACK arrived 40.7 ms after the data.
+after** volucer's ACK arrived 40.7 ms after the data.
 
-The fix is receiver-side and is in `stokehold-fcgi`: `TCP_QUICKACK` immediately before each
+The fix is receiver-side and is in `volucer-fcgi`: `TCP_QUICKACK` immediately before each
 read on a TCP backend. The kernel clears the flag after using it and after every `recv`, so
 it is re-armed per read rather than set once at connect time, and it takes effect from the
 next read — which is the read whose ACKs would otherwise be delayed.
 
-**This was stokehold's bug, not the transport's**, and the earlier evidence already said so:
+**This was volucer's bug, not the transport's**, and the earlier evidence already said so:
 nginx + php-cgi over TCP, the same server and the same transport with a different client,
 measured a healthy 848 rps in an isolation test all along.
 
 ### The 8-segment write, which was real and was not the cause
 
-Per-connection `tcpdump` showed stokehold sending each FastCGI request as **8 separate TCP
+Per-connection `tcpdump` showed volucer sending each FastCGI request as **8 separate TCP
 segments** — each 8-byte record header written individually — where nginx sends 1–2.
 `Client::send` now assembles the request in a reused buffer and writes it once, with a test
 pinning the two framings to identical bytes. Measured before/after on the same methodology:
@@ -387,7 +387,7 @@ number that is suspiciously round in wall time is a timer, not a rate.**
 
 ### The buffering pass: what the syscall cut was worth in wall clock
 
-Hazard 38 in `stokehold/docs/plan.md` replaced every unbuffered transport stream with a
+Hazard 38 in `volucer/docs/plan.md` replaced every unbuffered transport stream with a
 buffered one, so a frame — a header followed by a payload — stops costing one `read(2)` per
 field. The counted syscalls fell a long way: the worker's response read went **6 → 1**, the
 FastCGI client's reply **4 → 1**, and the front-end's handling of a twelve-record request
@@ -512,7 +512,7 @@ because the worker's hash is part of what the option removes, and the residue is
 one losing cell look like noise rather than a mechanism. Server CPU per request on `/items`,
 median of three rounds at each level:
 
-| concurrency | stokehold | RoadRunner | stokehold's advantage |
+| concurrency | volucer | RoadRunner | volucer's advantage |
 |---|---|---|---|
 | c=8 | 124 µs | 159 µs | −35 µs |
 | c=12 | 121 µs | 160 µs | −39 µs |
@@ -521,9 +521,9 @@ median of three rounds at each level:
 | c=24 | 124 µs | 152 µs | −28 µs |
 | c=32 | 126 µs | 152 µs | −26 µs |
 
-Stokehold's per-request cost does not move at all across a 4× range of offered load, and
-RoadRunner's moves by 9 µs. If c=16 were a genuine crossover — the point at which stokehold's
-12 slots stop covering the offered concurrency — the stokehold column would be the one to bend
+Volucer's per-request cost does not move at all across a 4× range of offered load, and
+RoadRunner's moves by 9 µs. If c=16 were a genuine crossover — the point at which volucer's
+12 slots stop covering the offered concurrency — the volucer column would be the one to bend
 there. It does not bend anywhere. What *does* move is the tail: see "A single cell that is not a
 crossover, and the tail that is".
 
@@ -548,12 +548,12 @@ is that the trade is now priced correctly instead of being dismissed as 0.26%.
 ### A single cell that is not a crossover, and the tail that is
 
 The table above has one cell where RoadRunner wins: `/items` at c=16, −1.7%. The obvious
-reading is a crossover — stokehold's pool has 12 slots and c=16 is the first concurrency
+reading is a crossover — volucer's pool has 12 slots and c=16 is the first concurrency
 above it — so it was chased with a denser sweep: the same two variants at c=12, 14, 16, 18,
 20 and 24, eight rounds, a balanced two-variant rotation so each variant starts first four
 times. 96 cells, none failed.
 
-| concurrency | stokehold | RoadRunner | stokehold's lead | per-round spread |
+| concurrency | volucer | RoadRunner | volucer's lead | per-round spread |
 |---|---|---|---|---|
 | c=12 | 15,678 | 15,482 | +1.3% | 1.003–1.041 |
 | c=14 | 16,932 | 16,745 | +1.1% | 0.985–1.018 |
@@ -567,13 +567,13 @@ times. 96 cells, none failed.
 at c=14, 16, 18 and 20, and the ratio wobbles non-monotonically. At this size a single
 concurrency level is not a meaningful unit — the honest statement is that **between
 concurrency 16 and 20 the two servers are within about 1% of each other, and outside that
-band stokehold leads.** Attributing the c=16 cell to slot exhaustion would have been a story
+band volucer leads.** Attributing the c=16 cell to slot exhaustion would have been a story
 the data does not support.
 
 The dense sweep did turn up something the sparse one could not: **a tail-latency divergence
 that has nothing to do with throughput.**
 
-| concurrency | stokehold p99 | RoadRunner p99 | ratio |
+| concurrency | volucer p99 | RoadRunner p99 | ratio |
 |---|---|---|---|
 | c=12 | 1,640 µs | 1,760 µs | 0.93× |
 | c=14 | 2,195 µs | 1,930 µs | 1.14× |
@@ -583,7 +583,7 @@ that has nothing to do with throughput.**
 | c=24 | 10,425 µs | 2,690 µs | 3.88× |
 
 RoadRunner's tail is **flat** above its slot count, which is what a pool that holds a queue
-looks like. Stokehold's grows without bound and its p50 stays *better* than RoadRunner's at
+looks like. Volucer's grows without bound and its p50 stays *better* than RoadRunner's at
 every level, so the mean is fine and the tail is not. A p99 that grows with offered load while
 the median improves is a signature of **queueing with no bound on the queue**, not of
 overload — the work is not slower, it is waiting longer before it starts.
@@ -607,7 +607,7 @@ the tail is a different proposition from one that is faster on both.
 The pool now measures it. `wait_us` accumulates, per slot, the time each request spent between
 asking for a slot and holding one, and counts each wait into powers of two so a percentile can
 be read out of it. Both figures are produced *inside the server* and printed at shutdown
-(stokehold `4dd402a`, `a6df392`), so they cannot include anything a client did.
+(volucer `4dd402a`, `a6df392`), so they cannot include anything a client did.
 `scripts/diag-slots.sh` drives it.
 
 Two experiments were run on the benchmark host, three repeats each, `/items`, 8 s per run.
@@ -681,7 +681,7 @@ fix *can* change is who that time is charged to. `try_lock` scanning for a free 
 rather than a fairness mechanism, and at c=32, where the damage is, all twelve slots are usually
 busy — there is little free to skip to. The fair queue makes a request wait for the slot it will
 actually use. `pick_slot`, the cursor and the healthy-not-free test are gone, replaced by a lease
-(stokehold `e2b031e`).
+(volucer `e2b031e`).
 
 Same two sweeps, on the idle host, three repeats per level:
 
@@ -738,14 +738,14 @@ Per-round ratios, so the claim can be checked rather than believed:
 | **c=32** | **1.229× (+22.9%)** | 1.197–1.244 | 1.302× (+30.2%) | 1.057× (+5.7%) |
 
 The spread never crosses 1.00 at either level, and every one of the 14 paired comparisons is the
-same way. The control confirms it is stokehold that moved rather than the host: on the same rounds
+same way. The control confirms it is volucer that moved rather than the host: on the same rounds
 **the pre-fair binary measured +3.0% and +5.7% over RoadRunner — the same band hazard 51 established
 for that binary in the interleaved A/B at the top of this report (+4.2% and +7.0% here, and −1.7% in
 the one `/items` c=16 cell of that pass)** — while the current build sits at +27% and +30%. The old
 build still lands exactly where it always did; the new one is 23–25% above it. So the blocked layout
 *understated* the gain, and the fair queue is the largest throughput effect this repository has
 measured — larger than the `crc32c` fix's +10–16%, which was called *"the whole lead"* over
-RoadRunner; the fix made stokehold 4–7% faster than RoadRunner, this makes it 27–30%. The one larger
+RoadRunner; the fix made volucer 4–7% faster than RoadRunner, this makes it 27–30%. The one larger
 effect measured here is not this project's code, and is not even a result: removing xdebug from the
 host's CLI PHP doubled the warm arms (8,566 → 16,329 rps, +91%), which was a configuration bug that
 made one arm measure the host rather than the server.
@@ -787,7 +787,7 @@ Median of 3 runs x 400 iterations per client, milliseconds. The ratio column is
 **cold-over-warm** (F/P), the direction that reads larger when the resident model is further
 ahead — the convention `scripts/compare_runs.py` also uses.
 
-| conc | P stokehold | R RoadRunner | F nginx+php-fpm | U stokehold unix | T stokehold TCP | F/P | F/R |
+| conc | P volucer | R RoadRunner | F nginx+php-fpm | U volucer unix | T volucer TCP | F/P | F/R |
 |---|---|---|---|---|---|---|---|
 | 1 | 0.584 | 0.592 | 1.234 | 1.521 | 1.548 | **2.11×** | 2.08× |
 | 2 | 0.573 | 0.591 | 1.204 | 1.421 | 1.361 | 2.10× | 2.04× |
@@ -885,7 +885,7 @@ framework boot would shrink every cold arm together and leave the ranking unchan
 milliseconds are not portable between the two; the direction and rough magnitude are.
 
 **Measured on a quiet host.** 12 cores, load 0.2, no other servers. The FPM arm's pool and
-the stokehold pool are matched on the model (`pm.max_children = 12` / `workers = 12`,
+the volucer pool are matched on the model (`pm.max_children = 12` / `workers = 12`,
 `pm.max_requests = 0` / `max_requests = 0`), and the cold arms' opcache settings are verified
 identical **through a request** rather than through the config file.
 
@@ -938,7 +938,7 @@ it belongs above:
 
 And one that was found by *not* trusting two measurements that agreed: the 10% deficit
 between P and R was small enough to call agreement, which is why it took a fourth pass
-(CPU attribution) to show it was stokehold's own waste rather than a server difference. The
+(CPU attribution) to show it was volucer's own waste rather than a server difference. The
 lesson is the same one this document keeps relearning: **two numbers agreeing does not mean
 either is right.**
 

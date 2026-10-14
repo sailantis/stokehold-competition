@@ -249,7 +249,7 @@ function percentile(array $sorted, float $p): float
     return $sorted[min($n - 1, (int) floor($n * $p))];
 }
 
-$scratch = sys_get_temp_dir() . '/stokehold-crossover-' . getmypid();
+$scratch = sys_get_temp_dir() . '/volucer-crossover-' . getmypid();
 if (!is_dir($scratch) && !mkdir($scratch, 0o700, true)) {
     fwrite(STDERR, "cannot create $scratch\n");
     exit(2);

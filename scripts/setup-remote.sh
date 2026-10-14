@@ -3,7 +3,7 @@
 #
 # Only the things that are not already part of a PHP deployment: `wrk` for the
 # load, nginx + php-fpm for the reference cold arm, and the php-cgi ini the cold
-# stokehold arms need. Idempotent — safe to re-run.
+# volucer arms need. Idempotent — safe to re-run.
 #
 # Usage:
 #   bash scripts/setup-remote.sh              # everything
@@ -45,7 +45,7 @@ fi
 
 # --- php-cgi ----------------------------------------------------------------
 #
-# The cold stokehold arms drive php-cgi directly. Note it is NOT installed by the
+# The cold volucer arms drive php-cgi directly. Note it is NOT installed by the
 # php-fpm package on every distribution.
 if need php-cgi; then
     echo "php-cgi: already installed ($(php-cgi -v 2>&1 | head -1))"
@@ -97,4 +97,4 @@ for s in php8.3-fpm php-fpm; do
 done
 echo
 echo "Passwordless sudo is needed for the FPM arm (it writes one pool file and one"
-echo "vhost, both named bench-stokehold, and removes them). Test it with: sudo -n true"
+echo "vhost, both named bench-volucer, and removes them). Test it with: sudo -n true"

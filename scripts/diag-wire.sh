@@ -10,8 +10,8 @@
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 DIR="$(mktemp -d /tmp/diag-wire.XXXXXX)"
 PHP_CGI="$(command -v php-cgi)"
 PORT=19550
@@ -77,15 +77,15 @@ sleep 0.5
 
 echo
 echo "=== segment timeline (relative seconds, microsecond precision) ==="
-echo "    a 127.0.0.1.<ephemeral> -> 127.0.0.1.$CGI_PORT   is stokehold sending to php-cgi"
-echo "    a 127.0.0.1.$CGI_PORT -> 127.0.0.1.<ephemeral>   is php-cgi sending to stokehold"
+echo "    a 127.0.0.1.<ephemeral> -> 127.0.0.1.$CGI_PORT   is volucer sending to php-cgi"
+echo "    a 127.0.0.1.$CGI_PORT -> 127.0.0.1.<ephemeral>   is php-cgi sending to volucer"
 echo
 sudo tcpdump -r /tmp/wire.pcap -nn -tt 2>/dev/null | awk '
 {
     # tcpdump -tt gives absolute epoch seconds with microseconds.
     t = $1 + 0
     if (first == 0) first = t
-    dir = ($3 ~ /^127\.0\.0\.1\.'"$CGI_PORT"'$/) ? "cgi -> stoke" : "stoke -> cgi"
+    dir = ($3 ~ /^127\.0\.0\.1\.'"$CGI_PORT"'$/) ? "cgi -> volucer" : "volucer -> cgi"
     flags = ""
     for (i = 5; i <= NF; i++) flags = flags " " $i
     printf "%10.6f  %-13s len %-5s%s\n", t - first, dir, $NF ~ /^length/ ? $NF : "", flags
@@ -105,5 +105,5 @@ sudo tcpdump -r /tmp/wire.pcap -nn -tt 2>/dev/null | awk '
 
 sudo rm -f /tmp/wire.pcap
 echo
-echo "=== stokehold log ==="
+echo "=== volucer log ==="
 tail -20 "$DIR/server.log"

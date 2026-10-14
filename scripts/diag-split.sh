@@ -1,15 +1,15 @@
 #!/bin/bash
 # Where does the 10% go? Server CPU versus PHP-worker CPU, per arm.
 #
-# The published sweep has stokehold's warm arm 10% behind RoadRunner's on every
+# The published sweep has volucer's warm arm 10% behind RoadRunner's on every
 # endpoint at concurrency 32 (16,329 vs 18,258 rps on `/items`), and the two are
 # supposed to be the same model: one server, one resident PHP process per slot,
 # one request at a time down a pipe. A 10% difference between two implementations
 # of the same design is small enough to be worth naming rather than shrugging at,
 # and there are only three places it can live:
 #
-#   (a) stokehold's HTTP front-end - accept, parse, `to_cgi`, spawn_blocking,
-#       `from_cgi`, write. If this is the difference, it is stokehold's code.
+#   (a) volucer's HTTP front-end - accept, parse, `to_cgi`, spawn_blocking,
+#       `from_cgi`, write. If this is the difference, it is volucer's code.
 #   (b) the worker protocol - how many round trips and how many bytes cross the
 #       pipe per request, and whether PHP's read loop is shaped well.
 #   (c) the client, or nothing at all - the run is not actually server-bound.
@@ -38,8 +38,8 @@
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 RR="${RR:-$HOME/bin/rr}"
 ARMS="${ARMS:-P,R,T}"
 CONC="${CONC:-32}"
@@ -62,7 +62,7 @@ trap cleanup EXIT
 
 # The same wrappers bench.sh uses, so this measures the same PHP the published
 # numbers came from and not the host's CLI defaults. Arms P and R were unwrapped
-# once and it cost them 2x - hazard 28 in the stokehold plan.
+# once and it cost them 2x - hazard 28 in the volucer plan.
 cat > "$DIR/php-worker-bench" <<WRAPPER
 #!/bin/sh
 exec $PHP -d opcache.enable_cli=1 -d opcache.validate_timestamps=0 \\
@@ -238,7 +238,7 @@ run_case() {
     total="$(echo "$by_comm" | awk '{s+=$2} END{printf "%.2f", s}')"
     # The server's own share against the workers', which is the comparison that
     # says whether the gap between two implementations is in the front-end.
-    server="$(echo "$by_comm" | awk '$1=="stokehold"||$1=="rr"{s+=$2} END{printf "%.2f", s}')"
+    server="$(echo "$by_comm" | awk '$1=="volucer"||$1=="rr"{s+=$2} END{printf "%.2f", s}')"
     php_total="$(echo "$by_comm" | awk '$1=="php"||$1=="php-cgi"{s+=$2} END{printf "%.2f", s}')"
     printf "    %-14s %6s cores  %8s us/request\n" \
         "TOTAL" "$total" "$(awk -v c="$total" -v r="$rps" 'BEGIN{ if (r>0) printf "%.0f", c*1000000/r; else print "?" }')"
@@ -261,7 +261,7 @@ echo "=============================================================="
 echo " CPU per request: server versus PHP, per arm"
 echo "=============================================================="
 echo "  host:      $(nproc) cores"
-echo "  stokehold: $($BIN version 2>/dev/null | head -1)"
+echo "  volucer: $($BIN version 2>/dev/null | head -1)"
 echo "  php:       $($DIR/php-worker-bench -v 2>/dev/null | head -1)"
 echo "  arms:      $ARMS   concurrency: $CONC   window: $DUR   workers: $WORKERS"
 if $PHP -m 2>/dev/null | grep -qi '^xdebug$'; then

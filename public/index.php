@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * The COLD arm's entry point: what nginx + php-fpm and stokehold + spawn_cgi run.
+ * The COLD arm's entry point: what nginx + php-fpm and volucer + spawn_cgi run.
  *
  * This file exists separately from `worker.php` on purpose. A cold arm must pay
  * the framework's boot *inside the timed request*, and the only honest way to

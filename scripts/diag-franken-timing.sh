@@ -7,7 +7,7 @@
 # else.
 set -uo pipefail
 FP=/home/competition/bin/frankenphp
-A=/home/competition/workspace/stokehold-competition
+A=/home/competition/workspace/volucer-competition
 R=/home/competition/fp-timing
 rm -rf "$R"; mkdir -p "$R"
 

@@ -1,6 +1,6 @@
 ==============================================================
  host load before: 3.79 1.32 0.49 1/316 2203682
- new:     7386ecf7b624a7ed1d321e1ba0c9d8b7  stokehold 0.1.0
+ new:     7386ecf7b624a7ed1d321e1ba0c9d8b7  volucer 0.1.0
  prefair: 8187d81a61b621ddb2995b79cf100b60
 ==============================================================
 
@@ -82,7 +82,7 @@ ROUND 7 of 7
   r7  rr        t=24      17931.42 rps  p50   1.26ms  p99   2.71ms
 
 ---- report for c=24 ----
-file:        /home/competition/stoke-bench-run-ab-slots-c24/slots.tsv
+file:        /home/competition/volucer-bench-run-ab-slots-c24/slots.tsv
 variants:    new, prefair, rr
 rounds:      1, 2, 3, 4, 5, 6, 7
 numerator:   new   denominator: prefair
@@ -190,7 +190,7 @@ ROUND 7 of 7
   r7  rr        t=32      17943.38 rps  p50   1.69ms  p99   3.27ms
 
 ---- report for c=32 ----
-file:        /home/competition/stoke-bench-run-ab-slots-c32/slots.tsv
+file:        /home/competition/volucer-bench-run-ab-slots-c32/slots.tsv
 variants:    new, prefair, rr
 rounds:      1, 2, 3, 4, 5, 6, 7
 numerator:   new   denominator: prefair

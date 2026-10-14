@@ -9,7 +9,7 @@
 #   1. The pool. `pick_slot` took each candidate slot's mutex inside its scan loop, so
 #      a request waited for whichever worker the cursor pointed at instead of being
 #      offered a free one. A slot is held for the whole request, so that wait is a
-#      real queue. A free list replaced it (stokehold e2b031e); the pool columns below
+#      real queue. A free list replaced it (volucer e2b031e); the pool columns below
 #      are what showed the defect and what show the fix.
 #   2. The client. Every harness here drives wrk as `-t$c -c$c`, so concurrency *is*
 #      the client's thread count. At c=16 the load generator owns 16 threads while
@@ -25,7 +25,7 @@
 #   - If p99 collapses as threads drop, the tail is the load generator's scheduling.
 #   - If p99 stays put, it is not, and the pool's own figure says whether it is the
 #     pool: the server prints, at shutdown, the mean and worst time requests spent
-#     waiting for a slot (stokehold commit 4dd402a). That line is measured inside the
+#     waiting for a slot (volucer commit 4dd402a). That line is measured inside the
 #     server, so it cannot be confused with anything the client did.
 #
 # One server per thread level, because both figures are cumulative for the life of the
@@ -47,14 +47,14 @@
 #   CONC=24 THREADS=2,4,8,12,16,24 bash diag-slots.sh
 #
 #   CONC=24 THREADS=24 DUR=8s ROUNDS=7 \
-#       BIN=~/stoke-bench/target/release/stokehold \
-#       BIN_PREFAIR=~/stoke-bench-prefair/target/release/stokehold \
+#       BIN=~/volucer-bench/target/release/volucer \
+#       BIN_PREFAIR=~/volucer-bench-prefair/target/release/volucer \
 #       VARIANTS=new,prefair,rr bash diag-slots.sh
 #
 # Environment:
-#   BIN      stokehold release binary  (default ~/stoke-bench/target/release/stokehold)
+#   BIN      volucer release binary  (default ~/volucer-bench/target/release/volucer)
 #   ROOT     checkout                  (default the script's parent directory)
-#   RUNDIR   rows land here            (default ~/stoke-bench-run-slots)
+#   RUNDIR   rows land here            (default ~/volucer-bench-run-slots)
 #   VARIANTS optional comma list enabling an interleaved A/B of two or more builds.
 #            With one variant this is the thread-count sweep; with two or more, every
 #            variant is measured inside the same round and the starting order is
@@ -74,8 +74,8 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(dirname "$SCRIPT_DIR")}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-slots}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run-slots}"
 ENDPOINT="${ENDPOINT:-/items}"
 CONC="${CONC:-32}"
 THREADS="${THREADS:-2,4,8,16,32}"
@@ -93,9 +93,9 @@ PORT="${PORT:-19860}"
 VARIANTS="${VARIANTS:-}"
 ROUNDS="${ROUNDS:-1}"
 # The control arm. `rr` is a reserved variant name: it is started from a RoadRunner
-# config instead of a stokehold TOML, and it prints no slot report. It is worth having
-# in an A/B because it shares no code with any build of stokehold, so a round in which
-# every stokehold variant moved while `rr` did not is a round in which stokehold moved.
+# config instead of a volucer TOML, and it prints no slot report. It is worth having
+# in an A/B because it shares no code with any build of volucer, so a round in which
+# every volucer variant moved while `rr` did not is a round in which volucer moved.
 RR="${RR:-$HOME/bin/rr}"
 
 PHP="$(command -v php || true)"
@@ -106,7 +106,7 @@ fail() {
     exit 1
 }
 
-[ -x "$BIN" ] || fail "no stokehold binary at $BIN"
+[ -x "$BIN" ] || fail "no volucer binary at $BIN"
 [ -f "$ROOT/composer.json" ] || fail "no checkout at $ROOT"
 [ -n "$PHP" ] || fail "no php on PATH"
 command -v wrk >/dev/null 2>&1 || fail "no wrk on PATH"
@@ -174,9 +174,9 @@ config_of() {
 
 write_variant_config() {
     local variant="$1" port="$2" file="$3"
-    # `rr` is not a stokehold backend: it gets a RoadRunner YAML and is started from the
+    # `rr` is not a volucer backend: it gets a RoadRunner YAML and is started from the
     # app root so `rr serve` finds the worker path relative to it. Pool size and the PHP
-    # wrapper match the stokehold configs exactly, because the pair exists to compare
+    # wrapper match the volucer configs exactly, because the pair exists to compare
     # servers, not pool sizes or PHP inis (hazard 28).
     if [ "$variant" = "rr" ]; then
         cat > "$file" <<EOF
@@ -283,7 +283,7 @@ word_after()  { awk -v k="$2" '{for(i=1;i<NF;i++)  if($i==k) print $(i+1)}' <<<"
 
 leak_check() {
     local variant="${1:-}" n pids
-    # A stokehold variant's children are `php .../worker.php`; RoadRunner's are
+    # A volucer variant's children are `php .../worker.php`; RoadRunner's are
     # `php .../roadrunner-worker.php`. Matching the script path is unambiguous — no host
     # service runs a worker from this checkout — and `-ww` is load-bearing: without it the
     # argv is truncated to the terminal width and the path is lost, which is exactly how
@@ -443,7 +443,7 @@ run_measurement() {
     line="$(slots_line "$log")"
     if [ -z "$line" ]; then
         if [ "$variant" = "rr" ]; then
-            # RoadRunner is the control: it shares no code with stokehold and prints no
+            # RoadRunner is the control: it shares no code with volucer and prints no
             # slot report, so its pool columns are left empty rather than invented.
             line=""
         else
@@ -452,7 +452,7 @@ run_measurement() {
             # that cannot be made. The two ways to get here are both worth failing on,
             # so both are named.
             echo "FATAL: the server printed no slot-contention report at shutdown." >&2
-            echo "       Either this binary predates the report (stokehold 4dd402a), or it" >&2
+            echo "       Either this binary predates the report (volucer 4dd402a), or it" >&2
             echo "       did not shut down gracefully and the report was never reached." >&2
             echo "       variant=$variant BIN=$(binary_of "$variant")" >&2
             echo "       last lines of the server log:" >&2

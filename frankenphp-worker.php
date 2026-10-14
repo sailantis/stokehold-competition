@@ -5,10 +5,10 @@ declare(strict_types=1);
 /**
  * The FrankenPHP arm's entry point: the third resident worker.
  *
- * `worker.php` (stokehold) and `roadrunner-worker.php` exist to keep the warm half
+ * `worker.php` (volucer) and `roadrunner-worker.php` exist to keep the warm half
  * of the comparison from resting on one implementation. This one is here for a
  * different reason: FrankenPHP is the other server that embeds a PHP runtime
- * *inside* its own process, which is the one architectural choice stokehold
+ * *inside* its own process, which is the one architectural choice volucer
  * deliberately rejects (no embedding, no FFI — see the plan's constraints). If the
  * question is ever "what does embedding buy you", this arm is the number that
  * answers it.
@@ -29,7 +29,7 @@ declare(strict_types=1);
  *
  * Recycling is deliberately NOT implemented here. `max_requests` is the
  * Caddyfile's business and is set to 0 there, matching `max_requests = 0` on the
- * stokehold and RoadRunner arms and `pm.max_requests = 0` on the FPM pool.
+ * volucer and RoadRunner arms and `pm.max_requests = 0` on the FPM pool.
  */
 
 require __DIR__ . '/vendor/autoload.php';

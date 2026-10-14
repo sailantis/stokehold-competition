@@ -1,4 +1,4 @@
-# stokehold-competition
+# volucer-competition
 
 Six ways to serve **one page on one machine**, measured identically.
 
@@ -13,8 +13,8 @@ The page is `GET /items`: one SQLite query through the azera ORM, rendered by a
 ClarityEngine template, through a controller with middleware. It is the cheapest
 route that still boots the container.
 
-The design memory behind stokehold itself — the numbered hazards, the step list and
-the open decisions — is [`stokehold/docs/plan.md`](https://github.com/sailantis/stokehold/blob/main/docs/plan.md).
+The design memory behind volucer itself — the numbered hazards, the step list and
+the open decisions — is [`volucer/docs/plan.md`](https://github.com/sailantis/volucer/blob/main/docs/plan.md).
 Where this README says "hazard 46" it means entry 46 there, and its section 10
 ("Where the work stands") is the current state of the build.
 
@@ -22,9 +22,9 @@ Where this README says "hazard 46" it means entry 46 there, and its section 10
 
 | arm | server | model | transport |
 |---|---|---|---|
-| **P** | stokehold `worker` | warm — framework booted once | pipe |
-| **T** | stokehold `spawn_cgi` | cold — framework booted per request | loopback TCP |
-| **U** | stokehold `spawn_cgi` | cold — framework booted per request | unix socket |
+| **P** | volucer `worker` | warm — framework booted once | pipe |
+| **T** | volucer `spawn_cgi` | cold — framework booted per request | loopback TCP |
+| **U** | volucer `spawn_cgi` | cold — framework booted per request | unix socket |
 | **R** | RoadRunner `worker` | warm — framework booted once | pipe |
 | **F** | nginx + php-fpm | cold — framework booted per request | unix socket |
 | **Z** | FrankenPHP | warm — framework booted once, **PHP embedded** | in-process |
@@ -39,7 +39,7 @@ Six arms is not six questions. Each pair isolates one variable:
 - **P vs R** — the server implementation at the same warm model.
 - **Z vs P/R** — embedding against spawning. Z is the only server here that runs PHP
   inside its own process; the other five all start an external interpreter. This is
-  the alternative stokehold rejects on principle, so Z is the number that principle
+  the alternative volucer rejects on principle, so Z is the number that principle
   was traded against. It is measured in the warm-vs-warm pass only, and its result is
   in [results/frankenphp.md](results/frankenphp.md): **a tie for fastest at
   concurrency 1, the slowest of the three from 8 upward, and not CPU-bound while it
@@ -48,7 +48,7 @@ Six arms is not six questions. Each pair isolates one variable:
 P-vs-T/U mixes the model with the transport. That mixed comparison is still the
 one that matters commercially — it is the two deployment models as they are
 actually deployed — but a claim about the transport alone has to come from T vs U,
-where the model is held equal. The stokehold plan already measured pipe and TCP as
+where the model is held equal. The volucer plan already measured pipe and TCP as
 identical to concurrency 8 on a trivial handler, so the pipe-specific cost is not
 expected to be large; this repository is what checks that on a real page.
 
@@ -66,13 +66,13 @@ reason is not the server:
 PHP's Windows stream layer takes ~100× longer to return from a blocking read on a
 pipe than on a socket, and the cost is paid *per request*. So on Windows arm P —
 warm, but pipe-transported — is slower than arms T/U, which are cold but
-socket-transported, and the warm/cold comparison inverts. Nothing stokehold does
+socket-transported, and the warm/cold comparison inverts. Nothing volucer does
 causes it: a Rust process reading the identical pipe returns in 0.010 ms, and
-RoadRunner measured 15.15 ms against stokehold's 15.24 ms on the same host — two
+RoadRunner measured 15.15 ms against volucer's 15.24 ms on the same host — two
 independent servers and two independent SDKs agreeing to 0.6%.
 
 **So `arm P` on Windows is not the deployment model's value; it is the pipe's
-cost.** stokehold has a `transport = "socket"` option for this (see its README and
+cost.** volucer has a `transport = "socket"` option for this (see its README and
 plan hazard 46), and with it the same warm arm measures **0.72 ms median against
 15.24 ms on the pipe** — 21× faster, a 0.06 ms spread across 9 runs, and the two
 ranges are disjoint by two orders of magnitude. That is back in line with the Linux
@@ -80,12 +80,12 @@ figure, which is what shows the difference is the transport rather than the
 platform. To reproduce the Windows comparison:
 
 ```bash
-# the worker follows STOKEHOLD_WORKER_SOCKET when the server sets it
-# (Stokehold\Worker::connect()), so only the config differs
+# the worker follows VOLUCER_WORKER_SOCKET when the server sets it
+# (Volucer\Worker::connect()), so only the config differs
 transport = "socket"    # [backends.app]
 ```
 
-`worker.php` uses `Stokehold\Worker::connect()` for exactly this reason: it drives
+`worker.php` uses `Volucer\Worker::connect()` for exactly this reason: it drives
 both transports with no PHP-side change, so the arm can be measured on either. The
 SDK version pinned in `composer.json` must include `connect()`, since a worker that
 calls a method the pinned SDK does not have is a startup fatal error rather than a
@@ -173,7 +173,7 @@ The 0.72 ms figure above is a *sequential* measurement. The question a Windows
 deployment actually faces is what the socket does once the pool is saturated, and
 because the pipe arm is capped by something the socket arm is not, the answer is not
 the same ratio. Measured on this host (Ryzen 5 7500F, 6 cores / 12 threads, PHP
-8.3.31 ZTS, stokehold `279dc35`), `GET /items`, 12 workers, 5 runs of 5 s per cell:
+8.3.31 ZTS, volucer `279dc35`), `GET /items`, 12 workers, 5 runs of 5 s per cell:
 
 | conc | socket rps | pipe rps | ratio | socket p50 | pipe p50 |
 |---|---|---|---|---|---|
@@ -237,7 +237,7 @@ bash scripts/bench.sh
 deliberate, and it is the opposite of a library's convention: the lock is an input to the
 measurement. Eleven dependencies are floating ranges — including `spiral/roadrunner`, which *is*
 the RoadRunner arm — so an unlocked `composer install` a month from now would benchmark a
-different RoadRunner against the same stokehold and quietly produce an incomparable number. The
+different RoadRunner against the same volucer and quietly produce an incomparable number. The
 lock fixes every one of them; the three `sailantis/*` packages are pinned by commit ref in
 `composer.json` itself. If a run ever needs a newer RoadRunner, move the lock on purpose and say
 so in the results, rather than letting `composer update` do it silently.
@@ -247,7 +247,7 @@ and its `content-hash` was regenerated with the same no-flags `json_encode` Comp
 
 `bench.sh` needs `wrk`, `php-cgi`, and — for the FPM arm — `nginx`, `php-fpm` and
 passwordless `sudo` (it writes one pool file and one vhost, both named
-`bench-stokehold`, and removes them afterwards). Missing pieces skip their arms
+`bench-volucer`, and removes them afterwards). Missing pieces skip their arms
 with a reason rather than failing the run.
 
 The FrankenPHP arm is not part of `bench.sh`; it runs in the interleaved warm-arm pass
@@ -288,16 +288,16 @@ measures the middle and finds the advantage flat at ~2.0x from concurrency 1 to 
 — it does not cross over within the range this host can generate load for.
 
 The fourth pass exists because the third one left a discrepancy it could not
-explain: stokehold's warm arm sat ~10% behind RoadRunner's on *every* endpoint,
+explain: volucer's warm arm sat ~10% behind RoadRunner's on *every* endpoint,
 while running the same application through the same model. Wall clock cannot
 localise that — both servers report the same latency and the same rps — but CPU
 can, because the total is the sum of two halves. `diag-split.sh` attributes CPU
 per request across the arm's process tree (walked up the PPID chain, not matched on
-process name) and showed the whole gap was in stokehold's own server process:
+process name) and showed the whole gap was in volucer's own server process:
 413 µs against 309 µs, with the two totals agreeing to 1%. `diag-profile.sh` then
 named three functions, each of which made a full pass over the response body per
 request, and fixing them took the front-end from 413 µs to 137 µs — now cheaper
-than RoadRunner's 153 µs, and enough to put stokehold ahead end to end.
+than RoadRunner's 153 µs, and enough to put volucer ahead end to end.
 
 That last claim is the one worth re-checking, and a **fifth pass exists to check it**.
 A blocked sweep measures one arm at a time, so a host that drifts over twenty minutes
@@ -334,7 +334,7 @@ answer might be no: the lead read 1.20x in one sweep and 1.09x in the next one, 
 ran **identical warm code**, and the sweep after that read ~3% below its predecessor in
 every cell. Comparing sweeps cannot settle it — in the sweep that looked like a
 regression, *every* arm fell, including RoadRunner and nginx + php-fpm, which none of
-the intervening commits touch. That is the host, not stokehold.
+the intervening commits touch. That is the host, not volucer.
 
 So four variants were measured **inside the same round**, with the starting order
 rotated by round, on an idle host: the current build; the current build with the
@@ -386,17 +386,17 @@ passes reproduce with `scripts/ab-perf.sh` and `scripts/diag-checksum.sh`.
 ### The one cell RoadRunner wins is not a crossover, but the tail is real
 
 The table above has a single cell where RoadRunner is ahead — `/items` at c=16, −1.7% — and the
-tempting reading is slot exhaustion, because stokehold's pool has 12 slots and 16 is the first
+tempting reading is slot exhaustion, because volucer's pool has 12 slots and 16 is the first
 concurrency above it. A denser sweep says no: at c=12, 14, 16, 18, 20, 24 the lead is **+1.3%,
 +1.1%, −1.1%, −1.3%, −0.4%, +3.0%**, with the per-round spread crossing 1.00 at four of the six
 levels. There is no threshold and no bend; there is a ~1% deficit sitting somewhere between
-c=16 and c=20, which is about 200 rps out of 18,000. Per-request CPU confirms it — stokehold's
+c=16 and c=20, which is about 200 rps out of 18,000. Per-request CPU confirms it — volucer's
 server cost per request is **flat at 121–126 µs from c=8 to c=32**, so nothing changes at 16 for
 it to cross over at.
 
 What the denser sweep *did* find is a tail that diverges while the median does not:
 
-| concurrency | stokehold p99 | RoadRunner p99 |
+| concurrency | volucer p99 | RoadRunner p99 |
 |---|---|---|
 | c=12 | 1,640 µs | 1,760 µs |
 | c=16 | 3,470 µs | 2,105 µs |
@@ -404,7 +404,7 @@ What the denser sweep *did* find is a tail that diverges while the median does n
 | c=24 | 10,425 µs | 2,690 µs |
 
 RoadRunner's tail is flat above its slot count — what a pool with a queue looks like.
-Stokehold's grows with offered load while its **p50 stays better** than RoadRunner's at every
+Volucer's grows with offered load while its **p50 stays better** than RoadRunner's at every
 level. Growing p99 with an improving median is queueing, not slowness: the requests are not
 served slower, they wait longer before being served.
 
@@ -415,7 +415,7 @@ that the slot is *free* — and the mutex is then held across the whole request.
 **That was a hypothesis. It has since been measured, and it holds.** The pool now times every
 request from asking for a slot to holding one, per slot, and counts those waits into a
 powers-of-two histogram so it can report its own p50 and p99; the server prints both at shutdown
-(stokehold `4dd402a`, `a6df392`). Because the figure is produced inside the server it cannot
+(volucer `4dd402a`, `a6df392`). Because the figure is produced inside the server it cannot
 contain anything the load generator did, which is what makes it evidence rather than a second
 correlation.
 
@@ -488,7 +488,7 @@ makes it legible: the **pre-fair binary still measures +3.0%/+5.7% over RoadRunn
 hazard 51's interleaved A/B established for it, while the current build sits at +27%/+30%. So the
 blocked layout *understated* the gain, and this is the largest throughput effect this project's own
 code has produced — larger than the `crc32c` fix's +10–16%, which was called *"the whole lead"* over
-RoadRunner. The two effects larger than it are not stokehold's: removing xdebug from the host's CLI
+RoadRunner. The two effects larger than it are not volucer's: removing xdebug from the host's CLI
 PHP doubled the warm arms, and that was a configuration bug. The pool's p99 halves twice over as well (10.92 → 2.19 ms at c=24, 17.44 → 3.47 ms at
 c=32) *while* the mean wait falls (522 → 263 µs), and the p50 rises from 8 µs to 256 µs — the fairness
 made visible, the request served on contact now waiting a little so the unlucky one does not wait
@@ -561,7 +561,7 @@ months from now measures the same framework:
 |---|---|---|
 | `sailantis/azera-framework` | `4292198` | the worker path needs `Request::setRawBody()`, which postdates `v0.1.0` |
 | `sailantis/clarity-engine` | `ee06010` | the released `v0.3.0` plus one documentation commit |
-| `sailantis/stokehold-worker` | `5ede306` | current `main`; the SDK has no tag yet |
+| `sailantis/volucer-worker` | `5ede306` | current `main`; the SDK has no tag yet |
 
 All three are public, and `"no-api": true` on each repository makes composer clone
 them over git instead of through the GitHub API, which needs no token.
@@ -617,7 +617,7 @@ measurements claimed no throughput at all. Re-deriving it from the two committed
 shows what was actually there — every arm fell *except* the one the commits touched
 (P +0.35%, R −2.79%, F −1.63%, T −1.54%, U −1.77%, RoadRunner slower in 10 of 10 cells).
 The way to read that is a ratio against a control arm, which cancels whatever the host did
-underneath both, and by that reading the four commits *improved* stokehold's lead by 5.3%
+underneath both, and by that reading the four commits *improved* volucer's lead by 5.3%
 on `/`. A *ratio* that moves further than the spread is the thing worth explaining; a
 throughput delta of the same size is not.
 

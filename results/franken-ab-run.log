@@ -3,16 +3,16 @@
 ==============================================================
   host:        12 cores, 3884 MB
   php:         PHP 8.3.35 (cli) (built: Sep 25 2026 05:16:50) (NTS)
-  stokehold:   stokehold 0.1.0
+  volucer:   volucer 0.1.0
   new  binary: 7386ecf7b624a7ed1d321e1ba0c9d8b7
   variants:    franken,rr,new-req
   rotation:    round r starts at variant r mod 3
   endpoints:   /items
   concurrency: 1,8,16,32   duration: 5s   rounds: 7   workers: 12
 
-  franken -> /home/competition/stoke-bench-run-ab/franken.caddyfile  port 19900
-  rr -> /home/competition/stoke-bench-run-ab/rr.yaml  port 19901
-  new-req -> /home/competition/stoke-bench-run-ab/new-req.toml  port 19902
+  franken -> /home/competition/volucer-bench-run-ab/franken.caddyfile  port 19900
+  rr -> /home/competition/volucer-bench-run-ab/rr.yaml  port 19901
+  new-req -> /home/competition/volucer-bench-run-ab/new-req.toml  port 19902
 
   frankenphp:  FrankenPHP v1.13.0 PHP 8.5.11 Caddy v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=
 
@@ -178,14 +178,14 @@ ROUND 7 of 7
   leak check [new-req]: clean
 
 ==============================================================
- raw rows: /home/competition/stoke-bench-run-ab/ab-rps.tsv
+ raw rows: /home/competition/volucer-bench-run-ab/ab-rps.tsv
  85 lines
 ==============================================================
   measured cells: 84
   failed cells:   0
 
 =========== analysis ===========
-file:     /home/competition/stoke-bench-run-ab/ab-rps.tsv
+file:     /home/competition/volucer-bench-run-ab/ab-rps.tsv
 variants: franken, rr, new-req
 rounds:   1, 2, 3, 4, 5, 6, 7
 
@@ -209,20 +209,20 @@ the two questions, as ratios of ratios (median over rounds and cells)
   /items  c=1  
     the lead over rr     (new-req / rr)          1.362x  ( +36.2%)  [1.310..1.402]  n=7  <- every round the same way
     frankenphp vs rr     (franken / rr)          1.381x  ( +38.1%)  [1.350..1.401]  n=7  <- every round the same way
-    frankenphp vs stoke  (franken / new-req)     1.018x  (  +1.8%)  [0.969..1.054]  n=7
+    frankenphp vs volucer  (franken / new-req)     1.018x  (  +1.8%)  [0.969..1.054]  n=7
 
   /items  c=8  
     the lead over rr     (new-req / rr)          1.399x  ( +39.9%)  [1.380..1.442]  n=7  <- every round the same way
     frankenphp vs rr     (franken / rr)          1.288x  ( +28.8%)  [1.271..1.308]  n=7  <- every round the same way
-    frankenphp vs stoke  (franken / new-req)     0.921x  (  -7.9%)  [0.907..0.928]  n=7  <- every round the same way (down)
+    frankenphp vs volucer  (franken / new-req)     0.921x  (  -7.9%)  [0.907..0.928]  n=7  <- every round the same way (down)
 
   /items  c=16 
     the lead over rr     (new-req / rr)          1.146x  ( +14.6%)  [1.110..1.172]  n=7  <- every round the same way
     frankenphp vs rr     (franken / rr)          0.876x  ( -12.4%)  [0.852..0.884]  n=7  <- every round the same way (down)
-    frankenphp vs stoke  (franken / new-req)     0.759x  ( -24.1%)  [0.747..0.776]  n=7  <- every round the same way (down)
+    frankenphp vs volucer  (franken / new-req)     0.759x  ( -24.1%)  [0.747..0.776]  n=7  <- every round the same way (down)
 
   /items  c=32 
     the lead over rr     (new-req / rr)          1.277x  ( +27.7%)  [1.261..1.332]  n=7  <- every round the same way
     frankenphp vs rr     (franken / rr)          0.867x  ( -13.3%)  [0.854..0.901]  n=7  <- every round the same way (down)
-    frankenphp vs stoke  (franken / new-req)     0.677x  ( -32.3%)  [0.673..0.683]  n=7  <- every round the same way (down)
+    frankenphp vs volucer  (franken / new-req)     0.677x  ( -32.3%)  [0.673..0.683]  n=7  <- every round the same way (down)
 

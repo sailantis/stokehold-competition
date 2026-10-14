@@ -18,10 +18,10 @@ So the headline here is:
 
 `rr` is the denominator because it is the control: it shares no code with any
 other variant, so a ratio that moves while `rr`'s own absolute rps did not is a
-change in stokehold, and a round in which every variant moved together is the
+change in volucer, and a round in which every variant moved together is the
 host. That is the distinction `bench.sh`'s blocked layout cannot make.
 
-    python3 scripts/ab-report.py ~/stoke-bench-run-ab/ab-rps.tsv
+    python3 scripts/ab-report.py ~/volucer-bench-run-ab/ab-rps.tsv
 
 
 Exit status is 0 either way. This prints evidence; it does not pass or fail a run.
@@ -152,7 +152,7 @@ def main():
             lead_vs_rr = per_round("new-req", "rr")
             old_vs_rr = per_round("old-req", "rr")
             # The embedded runtime, against both warm servers. `franken` is not part
-            # of the stokehold story at all — it is the one arm that answers "what
+            # of the volucer story at all — it is the one arm that answers "what
             # does embedding buy you", so it is reported as its own pair of ratios
             # rather than folded into the checksum question above. Both denominators
             # are controls that share no code with it.
@@ -165,7 +165,7 @@ def main():
                 ("the lead over rr     (new-req / rr)      ", lead_vs_rr),
                 ("what the fix bought  (old-req / rr)      ", old_vs_rr),
                 ("frankenphp vs rr     (franken / rr)      ", franken_vs_rr),
-                ("frankenphp vs stoke  (franken / new-req) ", franken_vs_req),
+                ("frankenphp vs volucer  (franken / new-req) ", franken_vs_req),
             ]:
                 if not series:
                     continue

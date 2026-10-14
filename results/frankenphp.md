@@ -5,7 +5,7 @@ tuning, and it is the only arm in this repository that can.
 
 **FrankenPHP embeds the PHP interpreter inside its own process.** A Caddy server with a
 ZTS PHP built into the binary, one process, twelve worker threads. Every other arm spawns
-PHP as an external process; this one *is* PHP. That is precisely the choice stokehold
+PHP as an external process; this one *is* PHP. That is precisely the choice volucer
 rejects on purpose — "no PHP embedding, no FFI, `php`/`php-cgi`/`php-fpm` are always
 spawned as external processes" is the first constraint in the plan — so this arm is the
 number that constraint was traded against.
@@ -17,7 +17,7 @@ provides.
 
 ## The answer
 
-| concurrency (12 workers, `/items`) | FrankenPHP | stokehold `worker` | RoadRunner |
+| concurrency (12 workers, `/items`) | FrankenPHP | volucer `worker` | RoadRunner |
 |---|---|---|---|
 | 1 | 2,441 | 2,388 | 1,773 |
 | 8 | 14,337 | **15,538** | 11,131 |
@@ -29,18 +29,18 @@ verified-clean start. The spread across rounds was under 2% on every FrankenPHP 
 
 Within one round, as ratios (median over the 7 rounds, `[min..max]`):
 
-| concurrency | FrankenPHP / RoadRunner | stokehold / RoadRunner | FrankenPHP / stokehold |
+| concurrency | FrankenPHP / RoadRunner | volucer / RoadRunner | FrankenPHP / volucer |
 |---|---|---|---|
 | 1 | 1.381 `[1.350..1.401]` | 1.362 `[1.310..1.402]` | **1.018** `[0.969..1.054]` |
 | 8 | 1.288 `[1.271..1.308]` | 1.399 `[1.380..1.442]` | 0.921 `[0.907..0.928]` |
 | 16 | 0.876 `[0.852..0.884]` | 1.146 `[1.110..1.172]` | 0.759 `[0.747..0.776]` |
 | 32 | 0.867 `[0.854..0.901]` | 1.277 `[1.261..1.332]` | 0.677 `[0.673..0.683]` |
 
-**FrankenPHP and stokehold are indistinguishable at concurrency 1, and FrankenPHP is
+**FrankenPHP and volucer are indistinguishable at concurrency 1, and FrankenPHP is
 the slower of the three at 8, 16 and 32.** That c=1 cell is the one to read carefully: the
 median ratio is 1.018 and its spread spans 1.00 — and it did so in every run of this arm,
 before and after the client's CPU was accounted for. There is no evidence of a difference
-either way. Its 393 µs median against stokehold's 405 µs says the same thing.
+either way. Its 393 µs median against volucer's 405 µs says the same thing.
 
 The measured claim is therefore narrower than the first run of this arm suggested, and the
 narrowing is the interesting part. An earlier attempt put FrankenPHP 5.9% ahead at
@@ -48,7 +48,7 @@ concurrency 1; re-measured with the load generator's own CPU accounted for and f
 verified-clean start, that lead is gone. What survives is the shape, and it is consistent in
 every one of the 28 paired comparisons: **the arm with the interpreter inside its process
 does not convert concurrency into throughput.** From 8 to 32 it gains 10.4% (14,337 →
-15,823) where stokehold gains 49.6% (15,538 → 23,250).
+15,823) where volucer gains 49.6% (15,538 → 23,250).
 
 ## It is not that the interpreter is too slow
 
@@ -61,13 +61,13 @@ seconds at concurrency 16, sampling `utime + stime` for the whole process tree o
 |---|---|---|---|---|---|
 | FrankenPHP | 2 | 85.99 | 6.26 | **7.17** | 15,262 |
 | RoadRunner | 13 | 105.90 | 6.83 | 8.83 | 17,794 |
-| stokehold | 13 | 97.18 | 5.89 | 8.10 | 20,204 |
+| volucer | 13 | 97.18 | 5.89 | 8.10 | 20,204 |
 
 FrankenPHP serves the fewest requests per second *and* leaves the most cores idle: 7.17 of
-12, against stokehold's 8.10 at 33% higher throughput. So it is **not** CPU-bound. There is
+12, against volucer's 8.10 at 33% higher throughput. So it is **not** CPU-bound. There is
 capacity sitting unused while its throughput is capped, which is the signature of
 queueing or dispatch rather than of compute — and the latency columns agree, because its
-p50 at concurrency 32 is 1.89 ms against stokehold's 1.28 ms.
+p50 at concurrency 32 is 1.89 ms against volucer's 1.28 ms.
 
 Note the client column: `wrk` at concurrency 16 consumes 5.9–6.8 CPU-seconds too, about half
 a core per twelve-worker arm. That is real and belongs in the accounting, though it is too
@@ -145,7 +145,7 @@ they produced a number:
 ```bash
 VARIANTS=franken,rr,new-req ROUNDS=7 CONC=1,8,16,32 DUR=5s ENDPOINTS=/items \
     bash scripts/ab-perf.sh
-python3 scripts/ab-report.py ~/stoke-bench-run-ab/ab-rps.tsv
+python3 scripts/ab-report.py ~/volucer-bench-run-ab/ab-rps.tsv
 ```
 
 The arm needs the FrankenPHP release binary on the host:

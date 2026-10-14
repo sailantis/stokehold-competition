@@ -4,7 +4,7 @@
 # The evidence so far: T is a flat 42.0 ms per request on /items over loopback TCP,
 # U is 1.2 ms over a unix socket, TcpExtDelayedACKs is ~1 per request on T and
 # exactly 0 on U, and the wire trace shows php-cgi's trailing 1728-byte segment
-# leaving 10 us after stokehold's ACK arrives 40 ms late.
+# leaving 10 us after volucer's ACK arrives 40 ms late.
 #
 # That last number is the tell: 40 ms is the Linux delayed-ACK timer, and 6.8 gained a
 # knob for exactly it. If lowering the timer collapses the 42 ms, the mechanism is the
@@ -15,8 +15,8 @@
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 DIR="$(mktemp -d /tmp/diag-delack.XXXXXX)"
 PHP_CGI="$(command -v php-cgi)"
 PORT=19570

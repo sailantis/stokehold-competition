@@ -11,7 +11,7 @@ declare(strict_types=1);
  * "resident workers versus per-request boot" can be drawn from the pair.
  *
  * It drives the same `BenchApp` as `worker.php`, so the application is held equal
- * and only the server differs. The loop is longer than stokehold's because
+ * and only the server differs. The loop is longer than volucer's because
  * RoadRunner's SDK hands over a PSR-7 request that has to be turned back into a
  * method and URI, and because it requires an explicit `respond()`.
  */

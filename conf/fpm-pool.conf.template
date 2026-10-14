@@ -12,7 +12,7 @@
 ;   pm.max_children = 12   Matches `workers = 12`.
 ;   pm.max_requests = 0    Matches `max_requests = 0`: never recycle. This is the
 ;                          line hazard 29 is about — `0` is also what a real pool
-;                          config carries, and it is what stokehold used to misread
+;                          config carries, and it is what volucer used to misread
 ;                          as "recycle after every request".
 ;
 ; The ini overrides below are NOT optional for a fair comparison, and they are the

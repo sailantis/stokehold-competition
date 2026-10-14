@@ -11,7 +11,7 @@
 #
 #   * the PHP worker computes `crc32c` over the response payload when it writes the
 #     `BODY` frame — `hash('crc32c', ...)` in the SDK;
-#   * the stokehold server computes it again over the same bytes when it reads the
+#   * the volucer server computes it again over the same bytes when it reads the
 #     frame back.
 #
 # So `checksum = "optional"`, which is negotiated in the handshake and makes the
@@ -21,9 +21,9 @@
 # measurement: an arm that moves the PHP column or the server column but not both
 # is saying something the mechanism does not predict.
 #
-#   new-req   current stokehold, checksum = "required"
-#   new-opt   current stokehold, checksum = "optional"
-#   old-req   pre-crc32c-fix stokehold (hand-written bit-by-bit loop), checksum = "required"
+#   new-req   current volucer, checksum = "required"
+#   new-opt   current volucer, checksum = "optional"
+#   old-req   pre-crc32c-fix volucer (hand-written bit-by-bit loop), checksum = "required"
 #
 # The method is `diag-split.sh`'s: two snapshots of `utime + stime` taken around a
 # measured `wrk` run, walked up the PPID chain from the server's own pid, so the
@@ -37,8 +37,8 @@
 #   ROUNDS=3 bash diag-checksum.sh
 #
 # Environment:
-#   BIN       current stokehold release   (default ~/stoke-bench/target/release/stokehold)
-#   BIN_OLD   pre-crc32c-fix release      (default ~/stoke-bench-nocrc/target/release/stokehold)
+#   BIN       current volucer release   (default ~/volucer-bench/target/release/volucer)
+#   BIN_OLD   pre-crc32c-fix release      (default ~/volucer-bench-nocrc/target/release/volucer)
 #   ROOT      this checkout               (default the script's parent directory)
 set -uo pipefail
 
@@ -51,8 +51,8 @@ export PATH="$HOME/.cargo/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${ROOT:-$(dirname "$SCRIPT_DIR")}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
-BIN_OLD="${BIN_OLD:-$HOME/stoke-bench-nocrc/target/release/stokehold}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
+BIN_OLD="${BIN_OLD:-$HOME/volucer-bench-nocrc/target/release/volucer}"
 CONC="${CONC:-32}"
 DUR="${DUR:-8s}"
 ENDPOINT="${ENDPOINT:-/items}"
@@ -63,7 +63,7 @@ WARMUP="${WARMUP:-3s}"
 # The rows go to a stable path, not to the mktemp scratch: a per-request cost is a
 # deliverable of this pass the way `results/raw.tsv` is of the sweep, and the temp
 # directory is removed by the EXIT trap.
-RUNDIR="${RUNDIR:-$HOME/stoke-bench-run-cpu}"
+RUNDIR="${RUNDIR:-$HOME/volucer-bench-run-cpu}"
 
 PHP="$(command -v php || true)"
 HZ="$(getconf CLK_TCK)"
@@ -76,7 +76,7 @@ fail() {
     exit 1
 }
 
-[ -x "$BIN" ] || fail "no stokehold binary at $BIN"
+[ -x "$BIN" ] || fail "no volucer binary at $BIN"
 [ -x "$BIN_OLD" ] || fail "no pre-fix binary at $BIN_OLD (see the report's revision note)"
 [ -f "$ROOT/composer.json" ] || fail "no checkout at $ROOT"
 [ -n "$PHP" ] || fail "no php on PATH"
@@ -241,7 +241,7 @@ for round in $(seq 1 "$ROUNDS"); do
             snapshot_comm "$DIR/after.txt" >"$DIR/a.txt"
             by_comm="$(cpu_by_comm "$DIR/b.txt" "$DIR/a.txt" "$wall")"
 
-            server="$(awk '$1=="stokehold"{s+=$2} END{print s+0}' <<<"$by_comm")"
+            server="$(awk '$1=="volucer"{s+=$2} END{print s+0}' <<<"$by_comm")"
             phpc="$(awk '$1=="php"{s+=$2} END{print s+0}' <<<"$by_comm")"
             total="$(awk '{s+=$2} END{print s+0}' <<<"$by_comm")"
 

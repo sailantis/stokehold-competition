@@ -23,7 +23,7 @@ The pool columns are summarised as medians per variant, because the question the
 answer is structural ("does the queue shrink?") and a median over repeats is what
 the report quotes.
 
-    python3 scripts/slots-report.py ~/stoke-bench-run-slots/slots.tsv
+    python3 scripts/slots-report.py ~/volucer-bench-run-slots/slots.tsv
     python3 scripts/slots-report.py slots.tsv --numerator new --denominator prefair
 
 Exit status is 0 either way. This prints evidence; it does not pass or fail a run.

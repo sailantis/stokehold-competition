@@ -1,4 +1,4 @@
-# ARM P — stokehold + a resident worker, talking over a pipe.
+# ARM P — volucer + a resident worker, talking over a pipe.
 #
 # The warmest arm: the framework boots once, before the request loop, and every
 # request reuses the container. Measured against ARM T/U (the same application
@@ -9,7 +9,7 @@
 #   workers = 12   One per core on the benchmark host. Not "one per core of the
 #                  host you are reading this on": the sweep that produced the
 #                  published figures ran on 12 cores, and matching it is what
-#                  makes the numbers comparable. Hazard 24 in the stokehold plan
+#                  makes the numbers comparable. Hazard 24 in the volucer plan
 #                  records that worker count and core count are unrelated numbers
 #                  and that the useful sweep is cores x 2-3.
 #

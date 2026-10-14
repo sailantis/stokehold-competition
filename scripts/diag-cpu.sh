@@ -7,7 +7,7 @@
 #
 #   (a) the pool is the bottleneck — 12 single-threaded children that each block on
 #       read/write cannot keep 12 cores busy, so raising `workers` would raise throughput;
-#   (b) the *request path* is the bottleneck — stokehold's HTTP front-end or its pool
+#   (b) the *request path* is the bottleneck — volucer's HTTP front-end or its pool
 #       dispatch is saturated, so more children would add idle capacity, not requests.
 #
 # The decisive comparison is the same run at 12 and at 24 children. If throughput rises
@@ -22,8 +22,8 @@
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 DIR="$(mktemp -d /tmp/diag-cpu.XXXXXX)"
 PHP_CGI="$(command -v php-cgi)"
 PORT=19590
@@ -71,7 +71,7 @@ cpu_snapshot() {
         [ -r "$d/stat" ] || continue
         comm="$(awk '{print $2}' "$d/stat" 2>/dev/null)"
         case "$comm" in
-            \(php-cgi*|\(stokehold*|\(php-fpm*)
+            \(php-cgi*|\(volucer*|\(php-fpm*)
                 total=$(( total + $(awk '{print $14 + $15}' "$d/stat" 2>/dev/null || echo 0) ))
                 ;;
         esac

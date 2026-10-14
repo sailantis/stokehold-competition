@@ -21,9 +21,9 @@ from collections import defaultdict
 from pathlib import Path
 
 ARMS = {
-    "P": ("stokehold", "worker", "warm", "pipe"),
-    "T": ("stokehold", "spawn_cgi", "cold", "tcp"),
-    "U": ("stokehold", "spawn_cgi", "cold", "unix"),
+    "P": ("volucer", "worker", "warm", "pipe"),
+    "T": ("volucer", "spawn_cgi", "cold", "tcp"),
+    "U": ("volucer", "spawn_cgi", "cold", "unix"),
     "R": ("roadrunner", "worker", "warm", "pipe"),
     "F": ("nginx+php-fpm", "-", "cold", "unix"),
 }

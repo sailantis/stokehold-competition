@@ -1,13 +1,13 @@
-# ARM U — stokehold + spawn_cgi over a UNIX SOCKET.
+# ARM U — volucer + spawn_cgi over a UNIX SOCKET.
 #
-# Identical to `stoke-cgi-tcp.toml.template` except for the transport, which is
+# Identical to `volucer-cgi-tcp.toml.template` except for the transport, which is
 # the point: T and U are the same server, the same model and the same SAPI, so a
 # difference between them is the transport and nothing else. That pair is how this
 # repository answers the question hazard 23 left open — whether the FastCGI arm's
 # advantage over a piped worker is the transport or the SAPI.
 #
-#   socket = "unix:/run/stokehold/cgi"   A path PREFIX, not a finished path: slot 0
-#                  binds /run/stokehold/cgi.0.sock and slot 1 the next, because one
+#   socket = "unix:/run/volucer/cgi"   A path PREFIX, not a finished path: slot 0
+#                  binds /run/volucer/cgi.0.sock and slot 1 the next, because one
 #                  socket per process is what lets a slot be recycled on its own.
 #
 # `php-cgi -b` treats a bind argument containing no `:` as an AF_UNIX path on any
@@ -16,7 +16,7 @@
 # the configuration is rejected at startup rather than silently ignored — which is
 # why this arm is Linux/macOS only.
 #
-# The directory must exist and be writable by the user running stokehold. The pool
+# The directory must exist and be writable by the user running volucer. The pool
 # unlinks its sockets on shutdown, so a leftover file means a server that was
 # killed rather than stopped; `php-cgi` unlinks a stale path itself before binding.
 

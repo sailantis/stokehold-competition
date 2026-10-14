@@ -1,7 +1,7 @@
 #!/bin/bash
 # Where does the server process's CPU actually go?
 #
-# `diag-split.sh` shows stokehold's HTTP front-end burning ~1.36x RoadRunner's
+# `diag-split.sh` shows volucer's HTTP front-end burning ~1.36x RoadRunner's
 # CPU per request in the warm arm (206 us against 152). That is a fact about the
 # server, not about PHP - the two arms run the same PHP and the same application
 # - so the next question is which part of the front-end it is.
@@ -21,14 +21,14 @@
 # counts the syscalls that the flat profile only hints at.
 #
 # Usage:
-#   bash diag-profile.sh              # profile stokehold arm P for 8s at conc 32
+#   bash diag-profile.sh              # profile volucer arm P for 8s at conc 32
 #   ARM=T BIN=... bash diag-profile.sh
 #   ARM=R bash diag-profile.sh        # RoadRunner, for the other side
 
 set -u
 
-ROOT="${ROOT:-$HOME/workspace/stokehold-competition}"
-BIN="${BIN:-$HOME/stoke-bench/target/release/stokehold}"
+ROOT="${ROOT:-$HOME/workspace/volucer-competition}"
+BIN="${BIN:-$HOME/volucer-bench/target/release/volucer}"
 RR="${RR:-$HOME/bin/rr}"
 ARM="${ARM:-P}"
 CONC="${CONC:-32}"
