@@ -1,0 +1,47 @@
+round	arm	rps	p50_us	p99_us
+0	head-control-A	6159.6	5	7
+0	head-control-B	6197.2	5	7
+1	head-control-A	6341.2	5	6
+1	head-control-B	5872.4	5	7
+2	head-control-A	6254.8	5	7
+2	head-control-B	6300.4	5	7
+3	head-control-A	6356.4	4	6
+3	head-control-B	6306.0	5	6
+4	head-control-A	6325.2	5	6
+4	head-control-B	6330.0	5	6
+5	head-control-A	6119.6	5	7
+5	head-control-B	6336.4	5	6
+6	head-control-A	6186.8	5	6
+6	head-control-B	6314.8	5	6
+7	head-control-A	6263.6	5	6
+7	head-control-B	6270.8	5	6
+8	head-control-A	6375.6	4	6
+8	head-control-B	6383.6	4	6
+9	head-control-A	6395.6	4	6
+9	head-control-B	6388.4	4	6
+10	head-control-A	6277.2	5	6
+10	head-control-B	6358.0	4	6
+11	head-control-A	6313.2	5	6
+11	head-control-B	6377.2	4	6
+12	head-control-A	6358.0	4	6
+12	head-control-B	6286.0	4	7
+13	head-control-A	6221.2	5	6
+13	head-control-B	6338.8	4	6
+14	head-control-A	6218.8	5	6
+14	head-control-B	6224.4	5	7
+15	head-control-A	6323.6	5	6
+15	head-control-B	6227.6	5	7
+16	head-control-A	6375.6	4	6
+16	head-control-B	6216.4	5	7
+17	head-control-A	6295.6	5	7
+17	head-control-B	6382.8	4	6
+18	head-control-A	6297.2	5	6
+18	head-control-B	6291.6	5	6
+19	head-control-A	5862.0	5	9
+19	head-control-B	6346.8	5	6
+# effect_pct	0.344
+# ci95_lo_pct	-0.907
+# ci95_hi_pct	1.612
+# median_ratio	1.0013
+# spread_lo	0.9261
+# spread_hi	1.0827

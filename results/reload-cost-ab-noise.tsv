@@ -1,0 +1,27 @@
+round	arm	rps	p50_us	p99_us
+0	head-control-A	6217.2	5	7
+0	head-control-B	6133.2	5	7
+1	head-control-A	6337.2	5	6
+1	head-control-B	6142.0	5	7
+2	head-control-A	6348.4	4	6
+2	head-control-B	6242.0	5	6
+3	head-control-A	6330.0	5	6
+3	head-control-B	6052.4	5	7
+4	head-control-A	6266.8	5	6
+4	head-control-B	6056.4	5	7
+5	head-control-A	6205.2	5	7
+5	head-control-B	6156.4	5	7
+6	head-control-A	6064.4	5	7
+6	head-control-B	6214.0	5	6
+7	head-control-A	6351.6	4	6
+7	head-control-B	6090.0	5	7
+8	head-control-A	6098.8	5	7
+8	head-control-B	6209.2	5	7
+9	head-control-A	6022.0	5	7
+9	head-control-B	6040.4	5	7
+# effect_pct	-1.443
+# ci95_lo_pct	-2.910
+# ci95_hi_pct	0.046
+# median_ratio	0.9865
+# spread_lo	0.9561
+# spread_hi	1.0247

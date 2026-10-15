@@ -301,6 +301,74 @@ bug. Results were keyed by arm *label*, so an A-vs-A run with both arms labelled
 second reading overwrite the first and the ratio came out exactly 1 regardless of the servers. The
 round function now keys by slot. This is the same class of mistake the rest of this repository
 records: **a control that agrees perfectly is a control that is measuring nothing.**
+
+## What the reload indirection costs when nothing is reloaded
+
+The server README's reload section makes a specific claim about a cost: the request path used to
+read three `Arc`s directly off `FrontEnd` and now takes **one** snapshot from
+`Arc<Swappable<Reloaded>>`, and the snapshot is an `ArcSwap` load — a pointer read — so it should
+be unmeasurable against the three `Arc` clones it replaced. That is exactly the kind of sentence
+this project does not allow to stay unmeasured, and `scripts/reload-cost-ab.js` measures it with
+the same within-round rotated estimator.
+
+The arms are two **binaries**, built `--release` from the same toolchain:
+
+| arm | build | request-path state |
+|---|---|---|
+| A | `68bfdcc` — the last commit before the reload work | three `Arc`s on `FrontEnd` |
+| B | current `main` | one `Arc<Swappable<Reloaded>>` |
+
+Both serve a config with **no `[server.tls]`**, so the only difference is the indirection.
+`static_files` stays **on** here, and that is the opposite of the TLS measurement's choice on
+purpose: the site resolution and routing lookup the snapshot feeds are on the static path, so
+turning it off would measure a branch the change does not touch.
+
+    node scripts/reload-cost-ab.js   # BIN_A, BIN_B, ROUNDS, DURATION, OUT
+
+**Result — no measurable difference.** Twenty rounds, concurrency 32, 5 s per arm per round, two
+warmup rounds discarded, arm order rotated every round:
+
+    effect -0.09%   95% CI [-1.43%, +1.27%]   n = 20
+
+Raw rows: `results/reload-cost-ab-20.tsv`. An interval containing zero is a null result, and this
+one is wide — so the honest claim is **"not measurable here"**, not "zero". The 10-round run that
+came first is kept beside it as `results/reload-cost-ab.tsv` and read **+1.75%, 95% CI [+0.56%,
++2.95%]**, which *excludes* zero. That is the useful half of this record.
+
+**The first run reported a difference and the control refused it.** The A-vs-A control on the same
+host, at the same 20-round shape, reads:
+
+    effect +0.34%   95% CI [-0.91%, +1.61%]   n = 20     # results/reload-cost-ab-noise-20.tsv
+
+So the resolution is about ±1.5%, and the measured −0.09% sits well inside it: the two point
+estimates differ by **0.43 percentage points**, less than either interval. "Not measurable here" is
+the claim.
+
+The **10**-round pair is kept beside it because that is where the lesson is. The 10-round A-vs-B
+read `+1.75%, 95% CI [+0.56%, +2.95%]` — excluding zero — and the matching 10-round control read
+`−1.44%, 95% CI [−2.91%, +0.05%]`: a point estimate **larger than the effect it was the scale for,
+and in the opposite direction**. A run that stopped there would have become a commit message
+claiming the reload made the request path *faster* (`results/reload-cost-ab.tsv`,
+`results/reload-cost-ab-noise.tsv`).
+
+**This is the rule the TLS measurement already applied, applied where it bit.** The project's
+standard for a hot-path claim is an interval, not a point estimate, and the interval is only
+interpretable next to a control. Twenty rounds changed the verdict rather than the servers: the
+same two binaries moved from "there IS a difference" to "the claim holds", because the interval on
+log-ratios shrinks as √n while the per-round spread does not.
+
+**Window check, because hazard 56's lesson was about exactly this.** The two arms are separated by
+two commits and both are reload commits:
+
+    git log --oneline 68bfdcc..HEAD
+    8c63807  reload: make the certificate table replaceable, without a restart
+    a937f43  reload: make the request path's configuration replaceable without a restart
+
+`git merge-base --is-ancestor 68bfdcc HEAD` succeeds, and no other commit touches
+`volucer-http/src` in that range — so unlike the TLS-off comparison this **is** an isolation of the
+change under test rather than a window that happens to contain it. The only files in the window are
+the server crate, its tests, and documentation.
+
 ## Reproducing
 
 ```bash

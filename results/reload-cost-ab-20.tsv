@@ -1,0 +1,47 @@
+round	arm	rps	p50_us	p99_us
+0	pre-reload-68bfdcc	6154.8	5	6
+0	head	6328.4	4	6
+1	pre-reload-68bfdcc	6242.0	5	7
+1	head	6030.8	5	7
+2	pre-reload-68bfdcc	6194.8	5	7
+2	head	6253.2	5	6
+3	pre-reload-68bfdcc	6186.8	5	7
+3	head	6176.4	5	7
+4	pre-reload-68bfdcc	6269.2	5	6
+4	head	6178.0	5	7
+5	pre-reload-68bfdcc	6263.6	5	6
+5	head	6157.2	5	7
+6	pre-reload-68bfdcc	6263.6	5	6
+6	head	6227.6	5	7
+7	pre-reload-68bfdcc	6084.4	5	7
+7	head	6323.6	5	6
+8	pre-reload-68bfdcc	6265.2	5	7
+8	head	6062.8	5	7
+9	pre-reload-68bfdcc	6081.2	5	7
+9	head	6215.6	5	7
+10	pre-reload-68bfdcc	6213.2	5	7
+10	head	6142.0	5	7
+11	pre-reload-68bfdcc	6323.6	5	6
+11	head	6148.4	5	7
+12	pre-reload-68bfdcc	6407.6	4	6
+12	head	6092.4	5	8
+13	pre-reload-68bfdcc	6227.6	4	8
+13	head	6093.2	5	8
+14	pre-reload-68bfdcc	5788.4	5	8
+14	head	6339.6	4	6
+15	pre-reload-68bfdcc	6398.8	4	6
+15	head	6460.4	4	6
+16	pre-reload-68bfdcc	6388.4	4	7
+16	head	6414.8	4	6
+17	pre-reload-68bfdcc	6382.0	4	6
+17	head	6412.4	4	6
+18	pre-reload-68bfdcc	6354.8	4	6
+18	head	6354.8	4	6
+19	pre-reload-68bfdcc	6402.0	4	6
+19	head	6357.2	4	6
+# effect_pct	-0.092
+# ci95_lo_pct	-1.431
+# ci95_hi_pct	1.266
+# median_ratio	0.9983
+# spread_lo	0.9508
+# spread_hi	1.0952

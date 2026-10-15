@@ -69,6 +69,16 @@ results/*.log
 # reason a negative control is kept: without it the null has no scale.
 !results/tls-off-ab.tsv
 !results/tls-off-ab-noise.tsv
+# The reload-cost A/B is the same shape and a deliverable for the same reason: it is the only
+# measurement of what the reload indirection costs on a request path that never reloads, and the
+# server README's "what can be changed without a restart" section cites it. `-ab-20` is the run
+# that supersedes the 10-round one, kept rather than overwritten so the ratio the report quotes
+# can be re-derived from the repository; `-noise` is the A-vs-A control that gives the null its
+# scale, which is what makes "no measurable difference" a statement rather than a hope.
+!results/reload-cost-ab.tsv
+!results/reload-cost-ab-20.tsv
+!results/reload-cost-ab-noise.tsv
+!results/reload-cost-ab-noise-20.tsv
 # Editor / OS
 .idea/
 .vscode/
