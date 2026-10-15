@@ -225,6 +225,67 @@ endpoint)`, so giving both rows `P` would have merged the two transports into on
 median and destroyed the comparison. `compare_runs.py` loads the file and reports the
 `P` cells; the `Pp` rows are in the same file for the same treatment.
 
+## What TLS costs when it is off
+
+The README in the server repository claims that with no `[server.tls]` "there is no peek, no
+branch, and no TLS value is constructed — the cleartext path is the same code it was before TLS
+existed". That claim was written from reading the code, and for a while it said so: it was the one
+claim in the TLS work that had not been measured on this host.
+
+`scripts/tls-off-ab.js` measures it. The estimator is the same within-round rotated one
+`ab-perf.sh` uses, and the arms are two **binaries** rather than two settings:
+
+| arm | build |
+|---|---|
+| A | `206b41f` — the last commit before any TLS code existed |
+| B | current `main` |
+
+Both arms serve a config with **no `[server.tls]` at all**, so the difference is what the TLS work
+added to the plaintext path. Comparing TLS-on against TLS-off inside one binary would measure the
+*handshake* instead, and nobody disputes the handshake. `static_files` stays on: the workload is a
+1 KiB static file, which is the cheapest real request the server answers.
+
+    node scripts/tls-off-ab.js     # BIN_A, BIN_B, ROUNDS, DURATION, OUT
+
+`autocannon` is the load generator, because Windows is where this was run and `wrk` is not present
+there; `npm install autocannon` is the only prerequisite. The Node harness is deliberately
+self-contained rather than sharing the `.sh` scripts, which need a Linux host.
+
+**Result — no measurable difference.** Twelve rounds, concurrency 32, 6 s per arm per round, one
+warmup round discarded, arm order rotated every round:
+
+    effect -0.08%   95% CI [-0.66%, +0.51%]   n = 12
+
+Raw rows: `results/tls-off-ab.tsv`. An interval containing zero is a null result, and the claim
+holds. The bound is worth stating precisely: TLS costs **less than about 0.7%** on a plaintext
+deployment, which is smaller than this host can resolve per cell — so the honest form of the claim
+is "not measurable here" rather than "exactly nothing".
+
+**The noise floor, so the null means something.** An A-vs-A run — the same binary against itself,
+the arms labelled identically so any difference is pure measurement error — reads:
+
+    spread [0.9783, 1.0177]      # results/tls-off-ab-noise.tsv
+    spread [0.9870, 1.0275]      # the first pass, same shape
+
+So a single cell on this host is only good to about ±2%, and a difference smaller than that cannot
+be seen in one round. It can be seen in the *mean* of many, which is why the verdict is drawn from
+the interval rather than from the spread: the spread says whether one number is trustworthy, the
+interval says whether many of them, averaged, show an effect.
+
+**Two confounds, both stated rather than glossed.** The two builds differ by the TLS commits *and*
+by everything that landed after them, notably the fair queue (`e2b031e`), which is the largest
+effect this project has produced (+24.5% at c=24, +22.9% at c=32 on the cold arms). That confound
+is **not** live in this measurement, and the reason is the workload: the fair queue removed a slot
+*scan* per request, which costs CPU in proportion to 12 candidate workers — and a static file never
+runs a worker, so no slot is leased at all. The other confound is the bundled static layer, which
+is the same code in both builds, because `206b41f` is also after `6d7228d`.
+
+**A control that proved the harness wrong, and is recorded for that reason.** The first noise-floor
+run read exactly `1.0000` in all six rounds, which is not a tight measurement — it was a harness
+bug. Results were keyed by arm *label*, so an A-vs-A run with both arms labelled `head` made the
+second reading overwrite the first and the ratio came out exactly 1 regardless of the servers. The
+round function now keys by slot. This is the same class of mistake the rest of this repository
+records: **a control that agrees perfectly is a control that is measuring nothing.**
 ## Reproducing
 
 ```bash

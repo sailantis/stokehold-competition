@@ -1,0 +1,31 @@
+round	arm	rps	p50_us	p99_us
+0	pre-tls-206b41f	6630.7	4	6
+0	head	6681.3	4	6
+1	pre-tls-206b41f	6698.0	4	6
+1	head	6628.7	4	6
+2	pre-tls-206b41f	6670.0	4	6
+2	head	6669.3	4	6
+3	pre-tls-206b41f	6651.3	4	6
+3	head	6667.3	4	6
+4	pre-tls-206b41f	6686.7	4	6
+4	head	6712.0	4	6
+5	pre-tls-206b41f	6645.3	4	6
+5	head	6672.7	4	6
+6	pre-tls-206b41f	6677.3	4	6
+6	head	6562.0	4	6
+7	pre-tls-206b41f	6620.7	4	6
+7	head	6692.0	4	6
+8	pre-tls-206b41f	6685.3	4	6
+8	head	6643.3	4	6
+9	pre-tls-206b41f	6691.3	4	6
+9	head	6672.7	4	6
+10	pre-tls-206b41f	6616.0	4	6
+10	head	6718.7	4	6
+11	pre-tls-206b41f	6720.0	4	6
+11	head	6612.0	4	6
+# effect_pct	-0.077
+# ci95_lo_pct	-0.656
+# ci95_hi_pct	0.506
+# median_ratio	1.0024
+# spread_lo	0.9827
+# spread_hi	1.0155

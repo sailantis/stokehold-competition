@@ -62,8 +62,21 @@ results/*.log
 !results/slot-waits-fair-ab-run.log
 !results/franken-ab-run.log
 
+# The TLS-off A/B's rows are a deliverable like the rest: they are the only measurement in this
+# repository of what the TLS work costs on a deployment that never negotiates it, and the server
+# README's "what TLS costs when it is off" sentence cites this file. `-noise` is the A-vs-A
+# control that sets the resolution the null result is bounded by, and it is kept for the same
+# reason a negative control is kept: without it the null has no scale.
+!results/tls-off-ab.tsv
+!results/tls-off-ab-noise.tsv
 # Editor / OS
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# The TLS-off A/B's harness is a Node script, because it was measured on a Windows host where
+# `wrk` does not exist. Only the harness is here; its dependencies are not, for the same reason the
+# `.sh` scripts do not commit `wrk` — `autocannon` is a load generator, not part of the experiment.
+node_modules/
+package-lock.json
