@@ -272,13 +272,28 @@ be seen in one round. It can be seen in the *mean* of many, which is why the ver
 the interval rather than from the spread: the spread says whether one number is trustworthy, the
 interval says whether many of them, averaged, show an effect.
 
-**Two confounds, both stated rather than glossed.** The two builds differ by the TLS commits *and*
-by everything that landed after them, notably the fair queue (`e2b031e`), which is the largest
-effect this project has produced (+24.5% at c=24, +22.9% at c=32 on the cold arms). That confound
-is **not** live in this measurement, and the reason is the workload: the fair queue removed a slot
-*scan* per request, which costs CPU in proportion to 12 candidate workers — and a static file never
-runs a worker, so no slot is leased at all. The other confound is the bundled static layer, which
-is the same code in both builds, because `206b41f` is also after `6d7228d`.
+**One confound is live, and the first version of this paragraph got it wrong in both directions.**
+The obvious worry is the fair queue (`e2b031e`), the largest effect this project has produced
+(+24.5% at c=24, +22.9% at c=32 on the cold arms) — and it is **not** a confound at all, because it
+is an ancestor of the baseline: `git merge-base --is-ancestor e2b031e 206b41f` succeeds, so both
+arms are *after* it. The same is true of the bundled static layer (`6d7228d`). The paragraph here
+first argued that the fair queue was live-but-inert because "a static file never leases a slot",
+which was a guess about which lock protects a slot *and* a false statement about the baseline.
+
+**The confound that is actually live is `ba09e03` — the `HostMap` extraction.** It re-homed the
+site table on `HostMap<String>` and replaced the linear scan over wildcard patterns with a walk of
+the host's own labels, and it is one of exactly two commits in the whole window that touch
+`volucer-http/src` or the resolution path a plaintext request runs through:
+
+    git log --oneline 206b41f..HEAD -- crates/volucer-http/src
+    e1af51b  tls: check the certificate before the port   # load-time only
+    dae2983  refactor: rename stokehold to volucer        # names only
+
+So the window is TLS (a branch not taken when no `[server.tls]` is configured), `HostMap` (per
+request, and it is meant to be *faster*), a rename (no behaviour), and a load-time reorder. The
+measurement is still a valid null for the statement the server README makes — *no `[server.tls]`
+means no TLS branch, no peek, no TLS value* — because it compares that path before and after the
+TLS work; it is **not** a pure TLS isolation, and the `HostMap` difference is the honest caveat.
 
 **A control that proved the harness wrong, and is recorded for that reason.** The first noise-floor
 run read exactly `1.0000` in all six rounds, which is not a tight measurement — it was a harness
